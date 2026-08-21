@@ -1,0 +1,22 @@
+menu "BSP I2S"
+
+    config BSP_I2S_SCK_GPIO
+        int "I2S SCK (BCLK) GPIO"
+        default 41
+
+    config BSP_I2S_LRCK_GPIO
+        int "I2S LRCK (WS) GPIO"
+        default 43
+
+    config BSP_I2S_DSDIN_GPIO
+        int "I2S DSDIN GPIO (speaker DAC data in, ESP TX)"
+        default 42
+
+    config BSP_I2S_ASDOUT_GPIO
+        int "I2S ASDOUT GPIO (mic ADC data out, ESP RX)"
+        default 46
+        help
+            Cardputer's mic and speaker share one I2S bus (BCLK/WS) with separate
+            data lines: DSDIN carries ESP->speaker audio, ASDOUT carries
+            mic->ESP audio. MCLK is unused.
+endmenu

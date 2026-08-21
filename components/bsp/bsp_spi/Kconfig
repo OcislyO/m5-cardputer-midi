@@ -1,0 +1,23 @@
+menu "BSP SPI"
+
+    config BSP_SPI_HOST
+        int "SPI host (1=SPI2_HOST, 2=SPI3_HOST)"
+        default 1
+        range 1 2
+
+    config BSP_SPI_MOSI_GPIO
+        int "SPI MOSI GPIO"
+        default 35
+
+    config BSP_SPI_SCLK_GPIO
+        int "SPI SCLK GPIO"
+        default 36
+
+    config BSP_SPI_CS_GPIO
+        int "Default SPI CS GPIO"
+        default 37
+        help
+            Cardputer only wires one CS line today. MISO is unused (not wired).
+            Device drivers should use this pin for spics_io_num unless they
+            have their own dedicated CS line.
+endmenu

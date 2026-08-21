@@ -1,0 +1,15 @@
+menu "DRV ST7789"
+
+    config DRV_ST7789_RST_GPIO
+        int "ST7789 RST GPIO"
+        default 33
+
+    config DRV_ST7789_DC_GPIO
+        int "ST7789 DC/RS GPIO"
+        default 34
+
+    config DRV_ST7789_BL_GPIO
+        int "ST7789 backlight GPIO"
+        default 38
+
+endmenu

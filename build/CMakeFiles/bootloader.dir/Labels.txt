@@ -1,0 +1,13 @@
+# Target labels
+ bootloader
+# Source files and their labels
+/home/alrescha/esp32/projects/m5_midi/build/CMakeFiles/bootloader
+/home/alrescha/esp32/projects/m5_midi/build/CMakeFiles/bootloader.rule
+/home/alrescha/esp32/projects/m5_midi/build/CMakeFiles/bootloader-complete.rule
+/home/alrescha/esp32/projects/m5_midi/build/bootloader-prefix/src/bootloader-stamp/bootloader-build.rule
+/home/alrescha/esp32/projects/m5_midi/build/bootloader-prefix/src/bootloader-stamp/bootloader-configure.rule
+/home/alrescha/esp32/projects/m5_midi/build/bootloader-prefix/src/bootloader-stamp/bootloader-download.rule
+/home/alrescha/esp32/projects/m5_midi/build/bootloader-prefix/src/bootloader-stamp/bootloader-install.rule
+/home/alrescha/esp32/projects/m5_midi/build/bootloader-prefix/src/bootloader-stamp/bootloader-mkdir.rule
+/home/alrescha/esp32/projects/m5_midi/build/bootloader-prefix/src/bootloader-stamp/bootloader-patch.rule
+/home/alrescha/esp32/projects/m5_midi/build/bootloader-prefix/src/bootloader-stamp/bootloader-update.rule

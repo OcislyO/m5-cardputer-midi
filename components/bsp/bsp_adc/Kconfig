@@ -1,0 +1,14 @@
+menu "BSP ADC"
+
+    config BSP_ADC_VBAT_GPIO
+        int "ADC input GPIO (battery voltage sense)"
+        default 10
+
+    config BSP_ADC_ATTEN
+        int "ADC attenuation (0=0dB, 1=2.5dB, 2=6dB, 3=12dB)"
+        default 3
+        range 0 3
+        help
+            12dB gives the widest input range (~0-3.3V), which matches a
+            resistor-divided battery sense input.
+endmenu

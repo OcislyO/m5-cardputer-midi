@@ -1,0 +1,9 @@
+menu "DRV BMI270"
+
+    config DRV_BMI270_I2C_ADDR
+        hex "BMI270 I2C address"
+        default 0x68
+        help
+            Cardputer-ADV wires the BMI270 at 0x68 (SDO pin low) on the
+            shared I2C bus (SDA=G8, SCL=G9).
+endmenu

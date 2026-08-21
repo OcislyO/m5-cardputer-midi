@@ -1,0 +1,13 @@
+menu "DRV ES8311"
+
+    config DRV_ES8311_I2C_ADDR
+        hex "ES8311 I2C address"
+        default 0x18
+        help
+            0x18 when the codec's CE pin is tied low (Cardputer-ADV default),
+            0x19 if tied high.
+
+    config DRV_ES8311_I2C_SPEED_HZ
+        int "ES8311 I2C clock speed (Hz)"
+        default 100000
+endmenu

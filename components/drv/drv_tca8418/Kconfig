@@ -1,0 +1,25 @@
+menu "DRV TCA8418"
+
+    config DRV_TCA8418_I2C_ADDR
+        hex "TCA8418 I2C address"
+        default 0x34
+
+    config DRV_TCA8418_I2C_SPEED_HZ
+        int "TCA8418 I2C clock speed (Hz)"
+        default 400000
+
+    config DRV_TCA8418_INT_GPIO
+        int "TCA8418 INT GPIO"
+        default 11
+
+    config DRV_TCA8418_ROWS
+        int "Keypad matrix rows"
+        default 7
+
+    config DRV_TCA8418_COLS
+        int "Keypad matrix columns"
+        default 8
+        help
+            Cardputer-ADV wires the TCA8418 as a 7x8 keypad matrix
+            (SDA=G8, SCL=G9, INT=G11), per M5Stack's official pin map.
+endmenu

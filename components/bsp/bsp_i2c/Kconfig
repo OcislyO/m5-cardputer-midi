@@ -1,0 +1,17 @@
+menu "BSP (Cardputer)"
+
+    menu "I2C"
+        config BSP_I2C_PORT
+            int "I2C port number"
+            default 0
+
+        config BSP_I2C_SDA_GPIO
+            int "I2C SDA GPIO"
+            default 8
+
+        config BSP_I2C_SCL_GPIO
+            int "I2C SCL GPIO"
+            default 9
+    endmenu
+
+endmenu
