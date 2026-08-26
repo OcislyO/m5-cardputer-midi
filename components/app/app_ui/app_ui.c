@@ -32,6 +32,9 @@ static void app_ui_demo_task(void *arg)
     uint32_t tick = 0;
 
     ui_obj_t *box = sys_dsp_rect_register(s_screen, x, y, APP_UI_DEMO_BOX_SIZE, APP_UI_DEMO_BOX_SIZE, APP_UI_DEMO_COLOR);
+    // Nested under box, not s_screen: rides along with it as it moves,
+    // demonstrating that a moved parent carries its children with it.
+    sys_dsp_text_register(box, 0, 1, 10, 8, "hi", APP_UI_TEXT_COLOR);
 
     for (;;) {
         char tick_str[16];
@@ -56,7 +59,7 @@ static void app_ui_demo_task(void *arg)
             dy = -dy;
         }
 
-        sys_dsp_obj_move(box, (uint16_t)x, (uint16_t)y);
+        sys_dsp_obj_move(box, x, y);
 
         vTaskDelay(pdMS_TO_TICKS(APP_UI_DEMO_PERIOD_MS));
     }

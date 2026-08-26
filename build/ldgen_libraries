@@ -94,11 +94,13 @@
 /home/alrescha/esp32/projects/m5_midi/build/esp-idf/drv_tca8418/libdrv_tca8418.a
 /home/alrescha/esp32/projects/m5_midi/build/esp-idf/sys_kbd/libsys_kbd.a
 /home/alrescha/esp32/projects/m5_midi/build/esp-idf/app_ui/libapp_ui.a
+/home/alrescha/esp32/projects/m5_midi/build/esp-idf/app_midi/libapp_midi.a
+/home/alrescha/esp32/projects/m5_midi/build/esp-idf/bsp_i2s/libbsp_i2s.a
+/home/alrescha/esp32/projects/m5_midi/build/esp-idf/drv_es8311/libdrv_es8311.a
+/home/alrescha/esp32/projects/m5_midi/build/esp-idf/app_synth/libapp_synth.a
 /home/alrescha/esp32/projects/m5_midi/build/esp-idf/app_core/libapp_core.a
 /home/alrescha/esp32/projects/m5_midi/build/esp-idf/main/libmain.a
-/home/alrescha/esp32/projects/m5_midi/build/esp-idf/bsp_i2s/libbsp_i2s.a
 /home/alrescha/esp32/projects/m5_midi/build/esp-idf/espressif__i2c_bus/libespressif__i2c_bus.a
 /home/alrescha/esp32/projects/m5_midi/build/esp-idf/espressif__sensor_hub/libespressif__sensor_hub.a
 /home/alrescha/esp32/projects/m5_midi/build/esp-idf/espressif__bmi270/libespressif__bmi270.a
 /home/alrescha/esp32/projects/m5_midi/build/esp-idf/drv_bmi270/libdrv_bmi270.a
-/home/alrescha/esp32/projects/m5_midi/build/esp-idf/drv_es8311/libdrv_es8311.a

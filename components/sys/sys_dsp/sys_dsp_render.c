@@ -26,31 +26,47 @@ esp_err_t sys_dsp_render(ui_obj_t *obj)
     if (obj == NULL) {
         return ESP_ERR_INVALID_ARG;
     }
-    sys_dsp_invalidate(obj->rect);
+
+    xSemaphoreTake(s_tree_lock, portMAX_DELAY);
+    rect_t abs_rect = sys_dsp_obj_abs_rect(obj);
+    xSemaphoreGive(s_tree_lock);
+
+    sys_dsp_invalidate(abs_rect);
     return ESP_OK;
 }
 
 // Paints obj into band (if it overlaps), then its children, then its next
 // sibling -- parent-before-children, later-sibling-on-top, per ui_obj_t.
-static void sys_dsp_paint_node(ui_obj_t *obj, rect_t *band)
+// (origin_x, origin_y) is obj's parent's absolute origin, since obj->rect is
+// relative to it; obj->next shares that same origin (it's a sibling, under
+// the same parent), while obj->child's origin becomes obj's own absolute
+// position.
+static void sys_dsp_paint_node(ui_obj_t *obj, rect_t *band, int16_t origin_x, int16_t origin_y)
 {
     if (obj == NULL) {
         return;
     }
 
+    rect_t abs_rect = {
+        .x = (int16_t)(origin_x + obj->rect.x),
+        .y = (int16_t)(origin_y + obj->rect.y),
+        .w = obj->rect.w,
+        .h = obj->rect.h,
+    };
+
     rect_t clip;
-    if (obj->draw != NULL && sys_dsp_clip(&clip, &obj->rect, band)) {
-        obj->draw(obj, band);
+    if (obj->draw != NULL && sys_dsp_clip(&clip, &abs_rect, band)) {
+        obj->draw(obj, &abs_rect, band);
     }
 
-    sys_dsp_paint_node(obj->child, band);
-    sys_dsp_paint_node(obj->next, band);
+    sys_dsp_paint_node(obj->child, band, abs_rect.x, abs_rect.y);
+    sys_dsp_paint_node(obj->next, band, origin_x, origin_y);
 }
 
 static void sys_dsp_render_band(rect_t *band)
 {
     xSemaphoreTake(s_tree_lock, portMAX_DELAY);
-    sys_dsp_paint_node(s_active_root, band);
+    sys_dsp_paint_node(s_active_root, band, 0, 0);
     xSemaphoreGive(s_tree_lock);
 
     if (drv_st7789_set_window(band->x, band->y, band->x + band->w - 1, band->y + band->h - 1) != ESP_OK) {

@@ -69,7 +69,7 @@ static void sys_bat_sample(void *arg)
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "adc read failed: %s", esp_err_to_name(err));
         return;
-    } else {ESP_LOGI(TAG, "%d", adc_mv);}
+    }
     int batt_mv = adc_mv * SYS_BAT_DIVIDER_RATIO;
 
     xSemaphoreTake(s_lock, portMAX_DELAY);

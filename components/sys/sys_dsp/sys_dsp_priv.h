@@ -29,25 +29,28 @@ extern uint16_t sys_dsp_send_buff[SYS_DSP_MAX_RENDER_PIXELS];
 
 // Intersects a and b into *out; returns the intersection's pixel area (0 if
 // they don't overlap, and *out is zeroed so a zero-area result is never
-// mistaken for a real rect). *out may alias a or b.
+// mistaken for a real rect). *out may alias a or b. x/y are signed (an
+// object's absolute position can be negative, e.g. partly off the top/left
+// edge of the panel); math is done in int32_t so a/b's x/y+w/h never
+// overflows an int16_t before the min/max comparisons run.
 static inline uint32_t sys_dsp_clip(rect_t *out, const rect_t *a, const rect_t *b)
 {
-    uint16_t x0 = a->x > b->x ? a->x : b->x;
-    uint16_t y0 = a->y > b->y ? a->y : b->y;
-    uint16_t ax1 = a->x + a->w, bx1 = b->x + b->w;
-    uint16_t ay1 = a->y + a->h, by1 = b->y + b->h;
-    uint16_t x1 = ax1 < bx1 ? ax1 : bx1;
-    uint16_t y1 = ay1 < by1 ? ay1 : by1;
+    int32_t x0 = a->x > b->x ? a->x : b->x;
+    int32_t y0 = a->y > b->y ? a->y : b->y;
+    int32_t ax1 = (int32_t)a->x + a->w, bx1 = (int32_t)b->x + b->w;
+    int32_t ay1 = (int32_t)a->y + a->h, by1 = (int32_t)b->y + b->h;
+    int32_t x1 = ax1 < bx1 ? ax1 : bx1;
+    int32_t y1 = ay1 < by1 ? ay1 : by1;
 
     if (x1 <= x0 || y1 <= y0) {
         *out = (rect_t){ 0, 0, 0, 0 };
         return 0;
     }
 
-    out->x = x0;
-    out->y = y0;
-    out->w = x1 - x0;
-    out->h = y1 - y0;
+    out->x = (int16_t)x0;
+    out->y = (int16_t)y0;
+    out->w = (uint16_t)(x1 - x0);
+    out->h = (uint16_t)(y1 - y0);
     return (uint32_t)out->w * out->h;
 }
 
@@ -55,20 +58,22 @@ static inline uint32_t sys_dsp_clip(rect_t *out, const rect_t *a, const rect_t *
 // coalesced into one SPI transfer instead of two).
 static inline bool sys_dsp_rect_touches(const rect_t *a, const rect_t *b)
 {
-    return a->x <= b->x + b->w && b->x <= a->x + a->w &&
-           a->y <= b->y + b->h && b->y <= a->y + a->h;
+    return (int32_t)a->x <= (int32_t)b->x + b->w && (int32_t)b->x <= (int32_t)a->x + a->w &&
+           (int32_t)a->y <= (int32_t)b->y + b->h && (int32_t)b->y <= (int32_t)a->y + a->h;
 }
 
 static inline void sys_dsp_rect_union(rect_t *out, const rect_t *a, const rect_t *b)
 {
-    uint16_t x0 = a->x < b->x ? a->x : b->x;
-    uint16_t y0 = a->y < b->y ? a->y : b->y;
-    uint16_t x1 = (a->x + a->w) > (b->x + b->w) ? (a->x + a->w) : (b->x + b->w);
-    uint16_t y1 = (a->y + a->h) > (b->y + b->h) ? (a->y + a->h) : (b->y + b->h);
-    out->x = x0;
-    out->y = y0;
-    out->w = x1 - x0;
-    out->h = y1 - y0;
+    int32_t x0 = a->x < b->x ? a->x : b->x;
+    int32_t y0 = a->y < b->y ? a->y : b->y;
+    int32_t ax1 = (int32_t)a->x + a->w, bx1 = (int32_t)b->x + b->w;
+    int32_t ay1 = (int32_t)a->y + a->h, by1 = (int32_t)b->y + b->h;
+    int32_t x1 = ax1 > bx1 ? ax1 : bx1;
+    int32_t y1 = ay1 > by1 ? ay1 : by1;
+    out->x = (int16_t)x0;
+    out->y = (int16_t)y0;
+    out->w = (uint16_t)(x1 - x0);
+    out->h = (uint16_t)(y1 - y0);
 }
 
 
@@ -79,6 +84,20 @@ static inline void sys_dsp_rect_union(rect_t *out, const rect_t *a, const rect_t
 // paint).
 extern ui_obj_t *s_active_root;
 extern SemaphoreHandle_t s_tree_lock;
+
+// Resolves obj's absolute (screen) rect: obj->rect translated by the
+// position of every ancestor, since obj->rect is relative to obj->parent
+// (w/h are absolute magnitudes, untouched by nesting). Caller must hold
+// s_tree_lock -- an ancestor's rect can otherwise change mid-walk.
+static inline rect_t sys_dsp_obj_abs_rect(const ui_obj_t *obj)
+{
+    rect_t abs_rect = obj->rect;
+    for (const ui_obj_t *p = obj->parent; p != NULL; p = p->parent) {
+        abs_rect.x = (int16_t)(abs_rect.x + p->rect.x);
+        abs_rect.y = (int16_t)(abs_rect.y + p->rect.y);
+    }
+    return abs_rect;
+}
 
 // Idempotent: safe to call again after the first successful call.
 esp_err_t sys_dsp_obj_init(void);

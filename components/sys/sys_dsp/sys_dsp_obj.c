@@ -58,9 +58,9 @@ static void sys_dsp_free_ctx_simple(ui_obj_t *self)
 }
 
 // parent must not be NULL -- only sys_dsp_root_create() may produce a
-// parentless node.
+// parentless node. `rect` is relative to parent, per ui_obj_t.rect.
 static ui_obj_t *sys_dsp_obj_alloc(ui_obj_t *parent, rect_t rect, ui_obj_class_t kind, void *ctx,
-                                    void (*draw)(ui_obj_t *, rect_t *),
+                                    void (*draw)(ui_obj_t *, rect_t *, rect_t *),
                                     void (*free_ctx)(ui_obj_t *))
 {
     if (parent == NULL) {
@@ -89,11 +89,31 @@ static ui_obj_t *sys_dsp_obj_alloc(ui_obj_t *parent, rect_t rect, ui_obj_class_t
         }
         last->next = obj;
     }
+    rect_t abs_rect = sys_dsp_obj_abs_rect(obj);
     xSemaphoreGive(s_tree_lock);
 
-    sys_dsp_invalidate(rect);
+    sys_dsp_invalidate(abs_rect);
 
     return obj;
+}
+
+// Unions obj's absolute rect and its whole descendant subtree (children,
+// grandchildren, ...) into *out -- NOT obj's siblings. Caller must hold
+// s_tree_lock and pass *first = true on the outermost call.
+static void sys_dsp_obj_bbox(ui_obj_t *obj, rect_t *out, bool *first)
+{
+    rect_t abs_rect = sys_dsp_obj_abs_rect(obj);
+
+    if (*first) {
+        *out = abs_rect;
+        *first = false;
+    } else {
+        sys_dsp_rect_union(out, out, &abs_rect);
+    }
+
+    for (ui_obj_t *child = obj->child; child != NULL; child = child->next) {
+        sys_dsp_obj_bbox(child, out, first);
+    }
 }
 
 static void sys_dsp_obj_free_subtree(ui_obj_t *obj)
@@ -122,6 +142,7 @@ void sys_dsp_obj_unregister(ui_obj_t *obj)
     }
 
     bool was_active_root = false;
+    rect_t bbox = { 0, 0, 0, 0 };
 
     xSemaphoreTake(s_tree_lock, portMAX_DELAY);
     if (obj->parent != NULL) {
@@ -132,6 +153,8 @@ void sys_dsp_obj_unregister(ui_obj_t *obj)
         if (*link == obj) {
             *link = obj->next;
         }
+        bool first = true;
+        sys_dsp_obj_bbox(obj, &bbox, &first);
     } else if (s_active_root == obj) {
         // Roots aren't linked into any parent's child list -- the only
         // reference to one is s_active_root, if it's the selected one.
@@ -144,35 +167,49 @@ void sys_dsp_obj_unregister(ui_obj_t *obj)
         static const rect_t panel = { 0, 0, SYS_DSP_PANEL_WIDTH, SYS_DSP_PANEL_HEIGHT };
         sys_dsp_invalidate(panel);
     } else {
-        sys_dsp_invalidate(obj->rect);
+        // Covers obj's whole subtree, not just its own rect -- a descendant
+        // can extend past its parent, since children aren't clipped to it.
+        sys_dsp_invalidate(bbox);
     }
     sys_dsp_obj_free_subtree(obj);
 }
 
-esp_err_t sys_dsp_obj_move(ui_obj_t *obj, uint16_t x, uint16_t y)
+esp_err_t sys_dsp_obj_move(ui_obj_t *obj, int16_t x, int16_t y)
 {
     if (obj == NULL) {
         return ESP_ERR_INVALID_ARG;
     }
 
+    rect_t old_bbox = { 0, 0, 0, 0 };
+    rect_t new_bbox = { 0, 0, 0, 0 };
+    bool first;
+
     xSemaphoreTake(s_tree_lock, portMAX_DELAY);
-    rect_t old_rect = obj->rect;
+    first = true;
+    sys_dsp_obj_bbox(obj, &old_bbox, &first);
+
     obj->rect.x = x;
     obj->rect.y = y;
-    rect_t new_rect = obj->rect;
+
+    first = true;
+    sys_dsp_obj_bbox(obj, &new_bbox, &first);
     xSemaphoreGive(s_tree_lock);
 
-    sys_dsp_invalidate(old_rect);
-    sys_dsp_invalidate(new_rect);
+    // obj's whole subtree moved along with it (descendants are relative to
+    // obj), so both the vacated and the new bounding box need repainting.
+    sys_dsp_invalidate(old_bbox);
+    sys_dsp_invalidate(new_bbox);
     return ESP_OK;
 }
 
 
 // --- draw callbacks -------------------------------------------------------
 //
-// Each draw(self, band) call composites self's contribution into
-// sys_dsp_send_buff, which represents *band* (not self->rect): row stride is
-// band->w, and the top-left of the buffer is (band->x, band->y). Colors are
+// Each draw(self, abs_rect, band) call composites self's contribution into
+// sys_dsp_send_buff, which represents *band* (not abs_rect): row stride is
+// band->w, and the top-left of the buffer is (band->x, band->y). abs_rect is
+// self->rect resolved to absolute (screen) coordinates -- self->rect itself
+// is relative to self->parent, so it's not usable directly here. Colors are
 // byte-swapped on the way in, matching drv_st7789_fill's convention that the
 // wire format is big-endian RGB565 while callers/ctx pass/store it host
 // (little-endian) order.
@@ -182,10 +219,10 @@ static inline uint16_t sys_dsp_swap16(uint16_t c)
     return (uint16_t)((c << 8) | (c >> 8));
 }
 
-static void sys_dsp_rect_draw(ui_obj_t *self, rect_t *band)
+static void sys_dsp_rect_draw(ui_obj_t *self, rect_t *abs_rect, rect_t *band)
 {
     rect_t clip;
-    if (!sys_dsp_clip(&clip, &self->rect, band)) {
+    if (!sys_dsp_clip(&clip, abs_rect, band)) {
         return;
     }
 
@@ -198,7 +235,7 @@ static void sys_dsp_rect_draw(ui_obj_t *self, rect_t *band)
     }
 }
 
-ui_obj_t *sys_dsp_rect_register(ui_obj_t *parent, uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t color)
+ui_obj_t *sys_dsp_rect_register(ui_obj_t *parent, int16_t x, int16_t y, uint16_t w, uint16_t h, uint16_t color)
 {
     uint16_t *ctx = malloc(sizeof(uint16_t));
     if (ctx == NULL) {
@@ -220,24 +257,26 @@ esp_err_t sys_dsp_rect_set_color(ui_obj_t *obj, uint16_t color)
         return ESP_ERR_INVALID_ARG;
     }
 
+    rect_t abs_rect;
     xSemaphoreTake(s_tree_lock, portMAX_DELAY);
     *(uint16_t *)obj->ctx = color;
+    abs_rect = sys_dsp_obj_abs_rect(obj);
     xSemaphoreGive(s_tree_lock);
 
-    sys_dsp_invalidate(obj->rect);
+    sys_dsp_invalidate(abs_rect);
     return ESP_OK;
 }
 
-static void sys_dsp_pic_draw(ui_obj_t *self, rect_t *band)
+static void sys_dsp_pic_draw(ui_obj_t *self, rect_t *abs_rect, rect_t *band)
 {
     rect_t clip;
-    if (!sys_dsp_clip(&clip, &self->rect, band)) {
+    if (!sys_dsp_clip(&clip, abs_rect, band)) {
         return;
     }
 
     const uint16_t *pic = self->ctx;
     for (uint16_t row = 0; row < clip.h; row++) {
-        const uint16_t *src = pic + (size_t)(clip.y - self->rect.y + row) * self->rect.w + (clip.x - self->rect.x);
+        const uint16_t *src = pic + (size_t)(clip.y - abs_rect->y + row) * abs_rect->w + (clip.x - abs_rect->x);
         uint16_t *dst = sys_dsp_send_buff + (size_t)(clip.y - band->y + row) * band->w + (clip.x - band->x);
         for (uint16_t col = 0; col < clip.w; col++) {
             dst[col] = sys_dsp_swap16(src[col]);
@@ -245,7 +284,7 @@ static void sys_dsp_pic_draw(ui_obj_t *self, rect_t *band)
     }
 }
 
-ui_obj_t *sys_dsp_pic_register(ui_obj_t *parent, uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t *pic)
+ui_obj_t *sys_dsp_pic_register(ui_obj_t *parent, int16_t x, int16_t y, uint16_t w, uint16_t h, uint16_t *pic)
 {
     rect_t rect = { .x = x, .y = y, .w = w, .h = h };
     return sys_dsp_obj_alloc(parent, rect, UI_OBJ_CLASS_PIC, pic, sys_dsp_pic_draw, NULL);
@@ -288,10 +327,10 @@ static bool sys_dsp_glyph_bit(const char *text, size_t text_len, uint16_t self_c
     return (col_bits & (1u << self_row)) != 0;
 }
 
-static void sys_dsp_text_draw(ui_obj_t *self, rect_t *band)
+static void sys_dsp_text_draw(ui_obj_t *self, rect_t *abs_rect, rect_t *band)
 {
     rect_t clip;
-    if (!sys_dsp_clip(&clip, &self->rect, band)) {
+    if (!sys_dsp_clip(&clip, abs_rect, band)) {
         return;
     }
 
@@ -300,10 +339,10 @@ static void sys_dsp_text_draw(ui_obj_t *self, rect_t *band)
     size_t text_len = strlen(ctx->text);
 
     for (uint16_t row = 0; row < clip.h; row++) {
-        uint16_t self_row = clip.y - self->rect.y + row;
+        uint16_t self_row = clip.y - abs_rect->y + row;
         uint16_t *dst = sys_dsp_send_buff + (size_t)(clip.y - band->y + row) * band->w + (clip.x - band->x);
         for (uint16_t col = 0; col < clip.w; col++) {
-            uint16_t self_col = clip.x - self->rect.x + col;
+            uint16_t self_col = clip.x - abs_rect->x + col;
             // Off-glyph pixels are left untouched -- whatever an
             // earlier-painted object put there (background, image, ...)
             // shows through instead of being overwritten.
@@ -314,7 +353,7 @@ static void sys_dsp_text_draw(ui_obj_t *self, rect_t *band)
     }
 }
 
-ui_obj_t *sys_dsp_text_register(ui_obj_t *parent, uint16_t x, uint16_t y, uint16_t w, uint16_t h,
+ui_obj_t *sys_dsp_text_register(ui_obj_t *parent, int16_t x, int16_t y, uint16_t w, uint16_t h,
                                  const char *text, uint16_t color)
 {
     sys_dsp_text_ctx_t *ctx = malloc(sizeof(sys_dsp_text_ctx_t));
@@ -352,11 +391,13 @@ esp_err_t sys_dsp_text_set_text(ui_obj_t *obj, const char *text)
     }
 
     sys_dsp_text_ctx_t *ctx = obj->ctx;
+    rect_t abs_rect;
     xSemaphoreTake(s_tree_lock, portMAX_DELAY);
     snprintf(ctx->text, ctx->cap, "%s", text != NULL ? text : "");
+    abs_rect = sys_dsp_obj_abs_rect(obj);
     xSemaphoreGive(s_tree_lock);
 
-    sys_dsp_invalidate(obj->rect);
+    sys_dsp_invalidate(abs_rect);
     return ESP_OK;
 }
 
@@ -366,11 +407,13 @@ esp_err_t sys_dsp_text_set_color(ui_obj_t *obj, uint16_t color)
         return ESP_ERR_INVALID_ARG;
     }
 
+    rect_t abs_rect;
     xSemaphoreTake(s_tree_lock, portMAX_DELAY);
     ((sys_dsp_text_ctx_t *)obj->ctx)->color = color;
+    abs_rect = sys_dsp_obj_abs_rect(obj);
     xSemaphoreGive(s_tree_lock);
 
-    sys_dsp_invalidate(obj->rect);
+    sys_dsp_invalidate(abs_rect);
     return ESP_OK;
 }
 

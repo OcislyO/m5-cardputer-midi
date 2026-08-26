@@ -43,8 +43,15 @@ static const char s_ascii_map_shift[4][14] = {
 };
 
 static QueueHandle_t s_evt_queue;
+static QueueHandle_t s_raw_queue;
 static TaskHandle_t s_task_handle;
 static bool s_shift_held = false;
+// Single word, only ever written by sys_kbd_task -- readable from any task
+// without a lock the same way s_shift_held is (see below), just also across
+// tasks: an aligned enum-sized read/write is atomic on this target, and a
+// reader racing the one task that writes it only ever sees the old or new
+// mode, never a torn value.
+static sys_kbd_mode_t s_mode = SYS_KBD_MODE_TYPING;
 
 // Remaps the TCA8418's 7x8 electrical matrix (row 0-6, col 0-7) onto
 // Cardputer's 4x14 physical key layout.
@@ -80,17 +87,43 @@ static void sys_kbd_task(void *arg)
                 s_shift_held = raw.pressed;
             }
 
-            sys_kbd_event_t evt = {
-                .keycode = keycode,
-                .ascii = (keycode == SYS_KBD_KEY_ASCII)
-                             ? (s_shift_held ? s_ascii_map_shift[row][col] : s_ascii_map[row][col])
-                             : 0,
-                .pressed = raw.pressed,
-                .row = row,
-                .col = col,
-            };
-            if (xQueueSend(s_evt_queue, &evt, 0) != pdTRUE) {
-                ESP_LOGW(TAG, "event queue full, dropping event");
+            // OPT+CAPSLOCK is the mode-switch chord: reserved outright, never
+            // forwarded to either queue. Toggling on the press that completes
+            // the chord (rather than tracking a separate "chord fired" flag)
+            // means it fires exactly once per chord, since the same key can't
+            // generate another press event without an intervening release.
+            if (s_shift_held) {
+                if (keycode == SYS_KBD_KEY_ENTER && raw.pressed) {
+                    s_mode = (s_mode == SYS_KBD_MODE_TYPING) ? SYS_KBD_MODE_RAW : SYS_KBD_MODE_TYPING;
+                    xQueueReset(s_evt_queue);
+                    xQueueReset(s_raw_queue);
+                    ESP_LOGI(TAG, "mode -> %s", (s_mode == SYS_KBD_MODE_TYPING) ? "typing" : "raw");
+                    continue;
+                }
+            }
+
+            if (s_mode == SYS_KBD_MODE_TYPING) {
+                sys_kbd_event_t evt = {
+                    .keycode = keycode,
+                    .ascii = (keycode == SYS_KBD_KEY_ASCII)
+                                 ? (s_shift_held ? s_ascii_map_shift[row][col] : s_ascii_map[row][col])
+                                 : 0,
+                    .pressed = raw.pressed,
+                    .row = row,
+                    .col = col,
+                };
+                if (xQueueSend(s_evt_queue, &evt, 0) != pdTRUE) {
+                    ESP_LOGW(TAG, "event queue full, dropping event");
+                }
+            } else {
+                sys_kbd_raw_event_t raw_evt = {
+                    .row = row,
+                    .col = col,
+                    .pressed = raw.pressed,
+                };
+                if (xQueueSend(s_raw_queue, &raw_evt, 0) != pdTRUE) {
+                    ESP_LOGW(TAG, "raw event queue full, dropping event");
+                }
             }
         }
 
@@ -119,6 +152,11 @@ esp_err_t sys_kbd_init(void)
         return ESP_ERR_NO_MEM;
     }
 
+    s_raw_queue = xQueueCreate(SYS_KBD_QUEUE_LEN, sizeof(sys_kbd_raw_event_t));
+    if (s_raw_queue == NULL) {
+        return ESP_ERR_NO_MEM;
+    }
+
     if (xTaskCreate(sys_kbd_task, "sys_kbd", SYS_KBD_TASK_STACK, NULL, SYS_KBD_TASK_PRIO, &s_task_handle) != pdPASS) {
         ESP_LOGE(TAG, "failed to create sys_kbd task");
         return ESP_ERR_NO_MEM;
@@ -140,4 +178,17 @@ esp_err_t sys_kbd_read_event(sys_kbd_event_t *out_event, TickType_t timeout)
         return ESP_ERR_INVALID_STATE;
     }
     return (xQueueReceive(s_evt_queue, out_event, timeout) == pdTRUE) ? ESP_OK : ESP_ERR_TIMEOUT;
+}
+
+esp_err_t sys_kbd_read_raw_event(sys_kbd_raw_event_t *out_event, TickType_t timeout)
+{
+    if (s_raw_queue == NULL || out_event == NULL) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    return (xQueueReceive(s_raw_queue, out_event, timeout) == pdTRUE) ? ESP_OK : ESP_ERR_TIMEOUT;
+}
+
+sys_kbd_mode_t sys_kbd_get_mode(void)
+{
+    return s_mode;
 }
