@@ -594,6 +594,21 @@ endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for the subdirectory.
+  include("/home/alrescha/esp32/projects/m5_midi/build/esp-idf/bsp_i2s/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/alrescha/esp32/projects/m5_midi/build/esp-idf/drv_es8311/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/alrescha/esp32/projects/m5_midi/build/esp-idf/sys_audio/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
   include("/home/alrescha/esp32/projects/m5_midi/build/esp-idf/drv_tca8418/cmake_install.cmake")
 endif()
 
@@ -610,16 +625,6 @@ endif()
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for the subdirectory.
   include("/home/alrescha/esp32/projects/m5_midi/build/esp-idf/app_midi/cmake_install.cmake")
-endif()
-
-if(NOT CMAKE_INSTALL_LOCAL_ONLY)
-  # Include the install script for the subdirectory.
-  include("/home/alrescha/esp32/projects/m5_midi/build/esp-idf/bsp_i2s/cmake_install.cmake")
-endif()
-
-if(NOT CMAKE_INSTALL_LOCAL_ONLY)
-  # Include the install script for the subdirectory.
-  include("/home/alrescha/esp32/projects/m5_midi/build/esp-idf/drv_es8311/cmake_install.cmake")
 endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)

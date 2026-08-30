@@ -1,0 +1,22 @@
+menu "SYS AUDIO"
+
+    config SYS_AUDIO_SAMPLE_RATE_HZ
+        int "Audio output sample rate (Hz)"
+        default 44100
+        help
+            Must be a rate drv_es8311 supports at 16-bit/BCLK-derived clocking:
+            32000, 44100, 48000, 64000, 88200 or 96000 Hz.
+
+    config SYS_AUDIO_DEFAULT_VOLUME_PCT
+        int "Default speaker volume (%)"
+        range 0 100
+        default 70
+
+    config SYS_AUDIO_FRAME_SAMPLES
+        int "Transmit frame size (samples)"
+        default 256
+        help
+            Size, in 16-bit mono samples, of the shared transmit frame that
+            producers fill via sys_audio_get_frame before calling
+            sys_audio_send_frame.
+endmenu

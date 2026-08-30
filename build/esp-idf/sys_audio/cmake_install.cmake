@@ -1,4 +1,4 @@
-# Install script for directory: /home/alrescha/esp32/projects/m5_midi/components/app/app_midi_bus
+# Install script for directory: /home/alrescha/esp32/projects/m5_midi/components/sys/sys_audio
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)

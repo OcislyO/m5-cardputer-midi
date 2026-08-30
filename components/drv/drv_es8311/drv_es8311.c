@@ -1,5 +1,6 @@
 #include "drv_es8311.h"
 #include "bsp_i2c.h"
+#include "bsp_i2s.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -230,6 +231,12 @@ esp_err_t drv_es8311_init(uint32_t sample_rate_hz)
         return ESP_OK;
     }
 
+    esp_err_t bsp_err = bsp_i2s_init(sample_rate_hz);
+    if (bsp_err != ESP_OK) {
+        ESP_LOGE(TAG, "bsp_i2s_init failed: %s", esp_err_to_name(bsp_err));
+        return bsp_err;
+    }
+
     i2c_device_config_t dev_cfg = {
         .dev_addr_length = I2C_ADDR_BIT_LEN_7,
         .device_address = CONFIG_DRV_ES8311_I2C_ADDR,
@@ -336,6 +343,14 @@ esp_err_t drv_es8311_init(uint32_t sample_rate_hz)
     ESP_LOGI(TAG, "init done (addr=0x%02x rate=%" PRIu32 "Hz mclk=%" PRIu32 "Hz, BCLK-derived)",
              CONFIG_DRV_ES8311_I2C_ADDR, sample_rate_hz, mclk_hz);
     return ESP_OK;
+}
+
+esp_err_t drv_es8311_write(const int16_t *samples, size_t sample_count)
+{
+    if (!s_initialized) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    return bsp_i2s_write(samples, sample_count * sizeof(int16_t), NULL, portMAX_DELAY);
 }
 
 esp_err_t drv_es8311_set_volume(uint8_t volume_pct)

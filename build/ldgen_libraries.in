@@ -91,12 +91,13 @@ $<TARGET_FILE:__idf_drv_st7789>
 $<TARGET_FILE:__idf_sys_dsp>
 $<TARGET_FILE:__idf_bsp_adc>
 $<TARGET_FILE:__idf_sys_bat>
+$<TARGET_FILE:__idf_bsp_i2s>
+$<TARGET_FILE:__idf_drv_es8311>
+$<TARGET_FILE:__idf_sys_audio>
 $<TARGET_FILE:__idf_drv_tca8418>
 $<TARGET_FILE:__idf_sys_kbd>
 $<TARGET_FILE:__idf_app_ui>
 $<TARGET_FILE:__idf_app_midi>
-$<TARGET_FILE:__idf_bsp_i2s>
-$<TARGET_FILE:__idf_drv_es8311>
 $<TARGET_FILE:__idf_app_synth>
 $<TARGET_FILE:__idf_app_core>
 $<TARGET_FILE:__idf_main>

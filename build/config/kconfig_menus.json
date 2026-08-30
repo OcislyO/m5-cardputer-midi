@@ -32991,6 +32991,47 @@
             {
                 "children": [
                     {
+                        "children": [],
+                        "depends_on": null,
+                        "help": "Must be a rate drv_es8311 supports at 16-bit/BCLK-derived clocking:\n32000, 44100, 48000, 64000, 88200 or 96000 Hz.",
+                        "id": "SYS_AUDIO_SAMPLE_RATE_HZ",
+                        "name": "SYS_AUDIO_SAMPLE_RATE_HZ",
+                        "range": null,
+                        "title": "Audio output sample rate (Hz)",
+                        "type": "int"
+                    },
+                    {
+                        "children": [],
+                        "depends_on": null,
+                        "help": null,
+                        "id": "SYS_AUDIO_DEFAULT_VOLUME_PCT",
+                        "name": "SYS_AUDIO_DEFAULT_VOLUME_PCT",
+                        "range": [
+                            0,
+                            100
+                        ],
+                        "title": "Default speaker volume (%)",
+                        "type": "int"
+                    },
+                    {
+                        "children": [],
+                        "depends_on": null,
+                        "help": "Size, in 16-bit mono samples, of the shared transmit frame that\nproducers fill via sys_audio_get_frame before calling\nsys_audio_send_frame.",
+                        "id": "SYS_AUDIO_FRAME_SAMPLES",
+                        "name": "SYS_AUDIO_FRAME_SAMPLES",
+                        "range": null,
+                        "title": "Transmit frame size (samples)",
+                        "type": "int"
+                    }
+                ],
+                "depends_on": null,
+                "id": "component-config-sys-audio",
+                "title": "SYS AUDIO",
+                "type": "menu"
+            },
+            {
+                "children": [
+                    {
                         "children": [
                             {
                                 "children": [],

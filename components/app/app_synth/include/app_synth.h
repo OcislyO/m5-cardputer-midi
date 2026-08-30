@@ -1,46 +1,38 @@
 #pragma once
 
 #include "esp_err.h"
+#include "sys_audio.h"
 #include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+#define APP_SYNTH_SAMPLE_RATE   44100
+
+#define APP_SYNTH_WT_SIZE      256 // samples per waveform cycle, a power of 2
+#define APP_SYNTH_WT_FRAC_BITS 24  // low bits of a 32-bit phase used to interpolate between table entries; the remaining 8 = log2(APP_SYNTH_WT_SIZE) index the table
+
+typedef enum {
+    APP_SYNTH_WAVE_SINE = 0,
+    APP_SYNTH_WAVE_TRIANGLE,
+    APP_SYNTH_WAVE_SAW,
+    APP_SYNTH_WAVE_SQUARE,
+    APP_SYNTH_WAVE_COUNT,
+} app_synth_wave_t;
+
 /**
- * @brief Bring up the synth engine: initializes the shared I2S bus and
- *        ES8311 codec for audio output, seeds the wavetables, starts the
- *        background task that renders active voices (see
- *        app_synth_note_on/off) and streams the mix out through bsp_i2s,
- *        and subscribes its own task to the MIDI bus (app_midi_bus.h) so it
- *        plays whatever NOTE_ON/OFF events show up there -- app_synth
- *        doesn't need anything else to drive it once this returns.
+ * @brief Bring up the synth engine: fills the four built-in wavetables
+ *        (sine, triangle, sawtooth, square) used as oscillator sources.
+ *        Idempotent: safe to call again after the first successful call.
  */
 esp_err_t app_synth_init(void);
 
 /**
- * @brief Start sounding a MIDI note: allocates (retriggering if `midi_note`
- *        already has a voice, else reusing an idle one, else stealing the
- *        oldest) a polyphonic FM voice -- two operators, a sine carrier
- *        phase-modulated by a sine modulator -- tuned to `midi_note`'s pitch
- *        and scaled by `velocity`, then starts its envelope's attack stage.
- *        Per MIDI convention, velocity == 0 is treated as a note-off.
+ * @brief Linearly-interpolated wavetable lookup. `phase` is a Q8.24
+ *        fixed-point value covering one full cycle (0 .. 0xFFFFFFFF).
  */
-esp_err_t app_synth_note_on(uint8_t midi_note, uint8_t velocity);
-
-/**
- * @brief Begin releasing a sounding MIDI note: moves its voice's operators
- *        into their envelope's release stage. The voice keeps rendering
- *        (fading out) until the release finishes, then is freed for reuse.
- *        A no-op if `midi_note` has no active voice.
- */
-esp_err_t app_synth_note_off(uint8_t midi_note);
-
-/**
- * @brief Set the codec's output volume, 0-100%. Thin wrapper over
- *        drv_es8311_set_volume.
- */
-esp_err_t app_synth_set_volume(uint8_t volume_pct);
+int16_t app_synth_wavetable_sample(app_synth_wave_t wave, uint32_t phase);
 
 #ifdef __cplusplus
 }

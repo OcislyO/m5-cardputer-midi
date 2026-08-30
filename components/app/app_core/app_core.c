@@ -6,6 +6,7 @@
 #include "esp_log.h"
 #include "sys_dsp.h"
 #include "sys_bat.h"
+#include "sys_audio.h"
 #include "app_ui.h"
 #include "app_midi_bus.h"
 #include "app_midi_event.h"
@@ -48,14 +49,15 @@ void app_start(void)
 
     ESP_ERROR_CHECK(sys_dsp_init());
     ESP_ERROR_CHECK(sys_bat_init());
-    ESP_ERROR_CHECK(app_ui_start());
+    ESP_ERROR_CHECK(sys_audio_init());
 
     // app_synth and app_midi_event are independent consumers/producers on
     // the MIDI bus -- neither knows about the other, so order between them
     // doesn't matter, only that the bus itself exists first.
     ESP_ERROR_CHECK(app_midi_bus_init());
-    ESP_ERROR_CHECK(app_synth_init());
     ESP_ERROR_CHECK(app_midi_event_start());
+    ESP_ERROR_CHECK(app_ui_start());
+    ESP_ERROR_CHECK(app_synth_init());
 
     xTaskCreate(app_core_scale_demo_task, "app_core_scale_demo", 2048, NULL, 3, NULL);
 
