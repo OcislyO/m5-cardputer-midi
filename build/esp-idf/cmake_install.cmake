@@ -634,6 +634,11 @@ endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for the subdirectory.
+  include("/home/alrescha/esp32/projects/m5_midi/build/esp-idf/app_seq/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
   include("/home/alrescha/esp32/projects/m5_midi/build/esp-idf/app_core/cmake_install.cmake")
 endif()
 

@@ -24,7 +24,14 @@ esp_err_t bsp_i2s_init(uint32_t sample_rate_hz)
 
     i2s_std_config_t std_cfg = {
         .clk_cfg = I2S_STD_CLK_DEFAULT_CONFIG(sample_rate_hz),
-        .slot_cfg = I2S_STD_MSB_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_16BIT, I2S_SLOT_MODE_MONO),
+        .slot_cfg.data_bit_width = I2S_DATA_BIT_WIDTH_16BIT,
+        .slot_cfg.slot_bit_width = I2S_SLOT_BIT_WIDTH_16BIT,
+        .slot_cfg.slot_mode = I2S_SLOT_MODE_MONO,
+        .slot_cfg.slot_mask = I2S_STD_SLOT_BOTH,
+        .slot_cfg.ws_width = 16,
+        .slot_cfg.ws_pol = false,
+        .slot_cfg.bit_shift = true,
+        // .slot_cfg = I2S_STD_MSB_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_16BIT, I2S_SLOT_MODE_MONO),
         .gpio_cfg = {
             .mclk = I2S_GPIO_UNUSED,
             .bclk = (gpio_num_t)CONFIG_BSP_I2S_SCK_GPIO,

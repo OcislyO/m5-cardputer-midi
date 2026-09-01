@@ -99,6 +99,7 @@
 /home/alrescha/esp32/projects/m5_midi/build/esp-idf/app_ui/libapp_ui.a
 /home/alrescha/esp32/projects/m5_midi/build/esp-idf/app_midi/libapp_midi.a
 /home/alrescha/esp32/projects/m5_midi/build/esp-idf/app_synth/libapp_synth.a
+/home/alrescha/esp32/projects/m5_midi/build/esp-idf/app_seq/libapp_seq.a
 /home/alrescha/esp32/projects/m5_midi/build/esp-idf/app_core/libapp_core.a
 /home/alrescha/esp32/projects/m5_midi/build/esp-idf/main/libmain.a
 /home/alrescha/esp32/projects/m5_midi/build/esp-idf/espressif__i2c_bus/libespressif__i2c_bus.a

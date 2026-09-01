@@ -24,6 +24,8 @@
 
 static const char *TAG = "app_midi_event";
 
+int8_t app_midi_oct = 0;
+
 uint8_t app_midi_kbd_map[2][14] = 
 {
     {54,56,58,00,61,63,00,66,68,70,00,73,75,00},
@@ -38,12 +40,20 @@ static void app_midi_event_task(void *arg)
             continue;
         }
 
-        int base_note = 0;
-        int offset_note;
+        int base_note = app_midi_oct * 12;
+        int offset_note = 0;
         if (raw.row == APP_MIDI_EVENT_ROW_LOWER) {
             offset_note = app_midi_kbd_map[1][raw.col];
         } else if (raw.row == APP_MIDI_EVENT_ROW_UPPER) {
             offset_note = app_midi_kbd_map[0][raw.col];
+        } else if (raw.row == 0) {
+            if (raw.col == 11) {
+                app_midi_oct = app_midi_oct - 1 < -3 ? -3 : app_midi_oct - 1;
+            }
+            if (raw.col == 12) {
+                app_midi_oct = app_midi_oct + 1 > 3 ? 3 : app_midi_oct + 1;
+            }
+
         } else {
             continue; // not a piano row
         }

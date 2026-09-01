@@ -254,7 +254,7 @@ IGNORE_EXTRA_COMPONENT:UNINITIALIZED=
 PROJECT_SOURCE_DIR:UNINITIALIZED=/home/alrescha/esp32/projects/m5_midi
 
 //No help, variable specified on the command line.
-PYTHON:UNINITIALIZED=python
+PYTHON:UNINITIALIZED=/home/alrescha/.espressif/python_env/idf5.4_py3.12_env/bin/python
 
 //No help, variable specified on the command line.
 PYTHON_DEPS_CHECKED:UNINITIALIZED=1

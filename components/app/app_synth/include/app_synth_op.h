@@ -4,8 +4,8 @@
 extern "C" {
 #endif
 
+#include "app_synth.h"
 #include "app_synth_osc.h"
-#include "app_synth_env.h"
 
 #define MAX_OPERATOR_COUNT 6
 

@@ -1,9 +1,15 @@
-#include "app_synth_voice.h"
-#include "app_synth_op.h"
+#include "app_synth_env.h"
+#include "app_synth_osc.h"
 #include "app_synth_track.h"
+#include "app_synth_voice.h"
+#include "app_synth_priv.h"
+#include "freertos/semphr.h"
 
 app_synth_voice_t app_synth_voice_pool[MAX_VOICE_COUNT];
+extern app_synth_voice_t *note_map[MAX_TRACK_COUNT][128];  // 记录note->voice
 
+// Caller must hold s_synth_lock -- only called from app_synth_voice_on(),
+// which takes it.
 static app_synth_voice_t *app_synth_voice_alloc() {
     uint8_t min_level_index = 0;
     for (size_t i = 0; i < MAX_VOICE_COUNT; i++)
@@ -16,9 +22,17 @@ static app_synth_voice_t *app_synth_voice_alloc() {
         }
     }
 
-    app_synth_voice_pool[min_level_index].from_track->voice_count -= 1;
-    app_synth_voice_pool[min_level_index].env_state = env_state_idle;  // 池里没有空闲的voice就释放掉声音最小的。
-    return &app_synth_voice_pool[min_level_index];
+    app_synth_voice_t *voice = &app_synth_voice_pool[min_level_index];
+
+    for (size_t i = 0; i < 128; i++)
+    {
+        if (note_map[voice->from_track->midi_channel][i] == voice)
+            note_map[voice->from_track->midi_channel][i] = NULL;  // 偷音前从note map解除绑定，防止错误关闭新的voice。
+    }
+    
+    voice->from_track->voice_count -= 1;
+    voice->env_state = env_state_idle;  // 池里没有空闲的voice就释放掉声音最小的。
+    return voice;
 }
 
 
@@ -33,26 +47,31 @@ static esp_err_t app_synth_voice_free(app_synth_voice_t *voice) {
 }
 
 app_synth_voice_t *app_synth_voice_on(uint8_t track, float freq) {
-    app_synth_voice_t *voice = app_synth_voice_alloc();
-    if (! voice)
-        return voice;
-    
-    voice->from_track = &track_list[track];
-    app_synth_osc_set(&voice->osc,voice->from_track->wave, freq);
-    for (size_t i = 0; i < MAX_OPERATOR_COUNT; i++)
-    {
-        app_synth_op_set(&voice->op[i], &voice->osc);
-    }
-    
-    voice->level = 0;
-    voice->env_state = env_state_attack;
-    voice->from_track->voice_count += 1;
+    xSemaphoreTake(s_synth_lock, portMAX_DELAY);
 
+    app_synth_voice_t *voice = app_synth_voice_alloc();
+    if (voice) {
+        voice->from_track = &track_list[track];
+        app_synth_osc_set(&voice->osc,voice->from_track->wave, freq);
+        for (size_t i = 0; i < MAX_OPERATOR_COUNT; i++)
+        {
+            app_synth_op_set(&voice->op[i], &voice->osc);
+        }
+
+        voice->level = 0;
+        voice->env_state = env_state_attack;
+        voice->from_track->voice_count += 1;
+    }
+
+    xSemaphoreGive(s_synth_lock);
     return voice;
 }
 
 esp_err_t app_synth_voice_off(app_synth_voice_t *voice) {
-    return app_synth_voice_free(voice);
+    xSemaphoreTake(s_synth_lock, portMAX_DELAY);
+    esp_err_t err = app_synth_voice_free(voice);
+    xSemaphoreGive(s_synth_lock);
+    return err;
 }
 
 

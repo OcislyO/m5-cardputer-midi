@@ -11,6 +11,7 @@
 #include "app_midi_bus.h"
 #include "app_midi_event.h"
 #include "app_synth.h"
+#include "app_seq.h"
 #include "freertos/task.h"
 
 static const char *TAG = "app";
@@ -51,13 +52,15 @@ void app_start(void)
     ESP_ERROR_CHECK(sys_bat_init());
     ESP_ERROR_CHECK(sys_audio_init());
 
-    // app_synth and app_midi_event are independent consumers/producers on
-    // the MIDI bus -- neither knows about the other, so order between them
-    // doesn't matter, only that the bus itself exists first.
+    // app_synth, app_midi_event, and app_seq are independent consumers/
+    // producers on the MIDI bus -- none of them know about each other, so
+    // order between them doesn't matter, only that the bus itself exists
+    // first.
     ESP_ERROR_CHECK(app_midi_bus_init());
     ESP_ERROR_CHECK(app_midi_event_start());
-    ESP_ERROR_CHECK(app_ui_start());
+    ESP_ERROR_CHECK(app_ui_midi_start());
     ESP_ERROR_CHECK(app_synth_init());
+    ESP_ERROR_CHECK(app_seq_init());
 
     xTaskCreate(app_core_scale_demo_task, "app_core_scale_demo", 2048, NULL, 3, NULL);
 

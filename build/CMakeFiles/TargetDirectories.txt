@@ -947,6 +947,13 @@
 /home/alrescha/esp32/projects/m5_midi/build/esp-idf/app_synth/CMakeFiles/install.dir
 /home/alrescha/esp32/projects/m5_midi/build/esp-idf/app_synth/CMakeFiles/install/local.dir
 /home/alrescha/esp32/projects/m5_midi/build/esp-idf/app_synth/CMakeFiles/install/strip.dir
+/home/alrescha/esp32/projects/m5_midi/build/esp-idf/app_seq/CMakeFiles/__idf_app_seq.dir
+/home/alrescha/esp32/projects/m5_midi/build/esp-idf/app_seq/CMakeFiles/edit_cache.dir
+/home/alrescha/esp32/projects/m5_midi/build/esp-idf/app_seq/CMakeFiles/rebuild_cache.dir
+/home/alrescha/esp32/projects/m5_midi/build/esp-idf/app_seq/CMakeFiles/list_install_components.dir
+/home/alrescha/esp32/projects/m5_midi/build/esp-idf/app_seq/CMakeFiles/install.dir
+/home/alrescha/esp32/projects/m5_midi/build/esp-idf/app_seq/CMakeFiles/install/local.dir
+/home/alrescha/esp32/projects/m5_midi/build/esp-idf/app_seq/CMakeFiles/install/strip.dir
 /home/alrescha/esp32/projects/m5_midi/build/esp-idf/app_core/CMakeFiles/__idf_app_core.dir
 /home/alrescha/esp32/projects/m5_midi/build/esp-idf/app_core/CMakeFiles/edit_cache.dir
 /home/alrescha/esp32/projects/m5_midi/build/esp-idf/app_core/CMakeFiles/rebuild_cache.dir

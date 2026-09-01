@@ -4,13 +4,15 @@
 extern "C" {
 #endif
 
-#include "app_synth_op.h"
+#include "app_synth.h"
 #include "app_synth_env.h"
+#include "app_synth_op.h"
+#include "app_synth_osc.h"
 #include "app_synth_track.h"
 
-#define MAX_VOICE_COUNT     10
+#define MAX_VOICE_COUNT     20
 
-typedef struct
+typedef struct app_synth_voice_s
 {
     app_synth_track_t *from_track;
     app_synth_op_t op[6];

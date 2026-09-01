@@ -4,6 +4,8 @@
 extern "C" {
 #endif
 
+#include "app_synth.h"
+#include "app_synth_env.h"
 #include "app_synth_op.h"
 
 #define MAX_TRACK_COUNT 4

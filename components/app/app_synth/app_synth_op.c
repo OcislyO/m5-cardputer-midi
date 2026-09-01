@@ -1,3 +1,4 @@
+#include "app_synth_osc.h"
 #include "app_synth_op.h"
 #include "app_synth.h"
 
@@ -21,7 +22,7 @@ esp_err_t app_synth_op_modulate (app_synth_op_t *carrier, const app_synth_op_t *
     int16_t mod = app_synth_wavetable_sample(modulator->osc->wave, modulator->phase);
 
     // modulation 必须和 phase_inc 使用相同单位。
-    int32_t fm = mod << 16;
+    int32_t fm = mod << 15;
 
     // 每次都从基础 phase_inc 重新计算。
     carrier->phase_inc = carrier->osc->phase_inc + fm;

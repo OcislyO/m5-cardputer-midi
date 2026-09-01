@@ -13,6 +13,7 @@ extern "C" {
  *        exercise sys_dsp's dirty-rect renderer.
  */
 esp_err_t app_ui_start(void);
+esp_err_t app_ui_midi_start(void);
 
 #ifdef __cplusplus
 }

@@ -1,7 +1,9 @@
 #include "app_synth.h"
-#include "app_synth_voice.h"
 #include "app_synth_track.h"
+#include "app_synth_voice.h"
+#include "app_synth_priv.h"
 #include "app_midi_bus.h"
+#include "freertos/semphr.h"
 #include <math.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -23,6 +25,8 @@ app_synth_voice_t *note_map[MAX_TRACK_COUNT][128];  // 记录note->voice
 sys_audio_frame_t app_synth_frame;
 
 QueueHandle_t app_synth_midi_queue;
+
+SemaphoreHandle_t s_synth_lock;
 
 static void app_synth_task(void *arg);
 static void app_synth_engine_task(void *arg);
@@ -55,6 +59,11 @@ esp_err_t app_synth_init(void)
     memset(note_map, 0, sizeof(note_map));
 
     app_synth_track_init();
+
+    s_synth_lock = xSemaphoreCreateMutex();
+    if (! s_synth_lock) {
+        return ESP_ERR_NO_MEM;
+    }
 
     app_synth_midi_queue = xQueueCreate(10, sizeof(app_midi_event_t));
     if (! app_synth_midi_queue) {
@@ -97,6 +106,11 @@ static void app_synth_task(void *arg) {
     for (;;)
     {
         xQueueReceive(app_synth_midi_queue, &event, portMAX_DELAY);
+        if (event.channel >= MAX_TRACK_COUNT)
+        {
+            continue;
+        }
+        
         if (event.type == APP_MIDI_EVENT_NOTE_ON) {
             freq = 440.0f * powf(2.0f, (event.note - 69) / 12.0f);
             voice = app_synth_voice_on(event.channel, freq);
@@ -121,49 +135,18 @@ static void app_synth_engine_task(void *arg) {
     int16_t sample;
     for (;;)
     {
+        xSemaphoreTake(s_synth_lock, portMAX_DELAY);
         for (size_t i = 0; i < SYS_AUDIO_FRAME_SAMPLES; i++)
         {
             for (size_t j = 0; j < MAX_VOICE_COUNT; j++)
             {
                 voice = &app_synth_voice_pool[j];
 
-                /*env更新*/
                 if (voice->env_state == env_state_idle)
                     continue;
-                switch (voice->env_state)
-                {
-                case env_state_attack:
-                    voice->level += voice->from_track->env.attack;
-                    if (voice->level > 1)
-                        voice->env_state = env_state_decay;
-                    break;
-                    
-                case env_state_decay:
-                    voice->level -= voice->from_track->env.decay;
-                    if (voice->level <= voice->from_track->env.sustain) {
-                        voice->level = voice->from_track->env.sustain;
-                        voice->env_state = env_state_sustain;
-                    }
-                        
-                    break;
-                    
-                case env_state_sustain:
-                    /* code */
-                    break;
-                    
-                case env_state_release:
-                    voice->level -= voice->from_track->env.release;
-                    if (voice->level <= 0) {
-                        voice->level = 0;
-                        voice->env_state = env_state_idle;  // 标记为以释放
-                        voice->from_track->voice_count -= 1;
-                    }
-                    break;
-                
-                default:
-                    break;
-                }
-                
+
+                app_synth_env_update(voice);
+
                 if (voice->level)
                 {
                     sample += app_synth_voice_sample(voice) * voice->level;
@@ -173,13 +156,14 @@ static void app_synth_engine_task(void *arg) {
             sample = 0;
             if (temp > 0x7fff)
                 temp = 0x7fff;
-                
+
             if (temp < -32768)
                 temp = -32768;
             app_synth_frame.samples[i] = (uint16_t)temp;
         }
-        sys_audio_mix(s_wavetables[0]);
-        // sys_audio_mix(app_synth_frame.samples);
+        xSemaphoreGive(s_synth_lock);
+
+        sys_audio_mix(app_synth_frame.samples);
         memset(app_synth_frame.samples, 0, 512);
         sys_audio_send_frame();
     }
