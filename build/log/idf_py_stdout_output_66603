@@ -1,0 +1,30 @@
+[1/16] Performing build step for 'bootloader'
+[1/1] cd /home/alrescha/esp32/projects/m5_midi/build/bootloader/esp-idf/esptool_py && /home/alrescha/.espressif/python_env/idf5.4_py3.12_env/bin/python /home/alrescha/esp32/esp-idf/components/partition_table/check_sizes.py --offset 0x8000 bootloader 0x0 /home/alrescha/esp32/projects/m5_midi/build/bootloader/bootloader.bin
+Bootloader binary size 0x51c0 bytes. 0x2e40 bytes (36%) free.
+[2/16] No install step for 'bootloader'
+[3/16] Building C object esp-idf/sys_dsp/CMakeFiles/__idf_sys_dsp.dir/sys_dsp.c.obj
+[4/16] Building C object esp-idf/sys_dsp/CMakeFiles/__idf_sys_dsp.dir/sys_dsp_dirty.c.obj
+[5/16] Building C object esp-idf/app_ui/CMakeFiles/__idf_app_ui.dir/app_ui.c.obj
+/home/alrescha/esp32/projects/m5_midi/components/app/app_ui/app_ui.c:145:13: warning: 'app_ui_kbd_task' defined but not used [-Wunused-function]
+  145 | static void app_ui_kbd_task(void *arg)
+      |             ^~~~~~~~~~~~~~~
+/home/alrescha/esp32/projects/m5_midi/components/app/app_ui/app_ui.c:29:18: warning: 'shell_backgraund' defined but not used [-Wunused-variable]
+   29 | static ui_obj_t *shell_backgraund;
+      |                  ^~~~~~~~~~~~~~~~
+[6/16] Completed 'bootloader'
+[7/16] Building C object esp-idf/sys_dsp/CMakeFiles/__idf_sys_dsp.dir/sys_dsp_render.c.obj
+[8/16] Building C object esp-idf/sys_dsp/CMakeFiles/__idf_sys_dsp.dir/sys_dsp_obj.c.obj
+[9/16] Linking C static library esp-idf/sys_dsp/libsys_dsp.a
+[10/16] Building C object esp-idf/app_core/CMakeFiles/__idf_app_core.dir/app_core.c.obj
+[11/16] Linking C static library esp-idf/app_core/libapp_core.a
+[12/16] Linking C static library esp-idf/app_ui/libapp_ui.a
+[13/16] Generating ld/sections.ld
+[14/16] Linking CXX executable m5_midi.elf
+[15/16] Generating binary image from built executable
+esptool.py v4.11.0
+Creating esp32s3 image...
+Merged 2 ELF sections
+Successfully created esp32s3 image.
+Generated /home/alrescha/esp32/projects/m5_midi/build/m5_midi.bin
+[16/16] cd /home/alrescha/esp32/projects/m5_midi/build/esp-idf/esptool_py && /home/alrescha/.espressif/python_env/idf5.4_py3.12_env/bin/python /home/alrescha/esp32/esp-idf/components/partition_table/check_sizes.py --offset 0x8000 partition --type app /home/alrescha/esp32/projects/m5_midi/build/partition_table/partition-table.bin /home/alrescha/esp32/projects/m5_midi/build/m5_midi.bin
+m5_midi.bin binary size 0x5a7d0 bytes. Smallest app partition is 0x100000 bytes. 0xa5830 bytes (65%) free.

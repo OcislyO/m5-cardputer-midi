@@ -2,14 +2,12 @@
 #include "app_synth_osc.h"
 #include "app_synth_track.h"
 #include "app_synth_voice.h"
-#include "app_synth_priv.h"
+#include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 
 app_synth_voice_t app_synth_voice_pool[MAX_VOICE_COUNT];
 extern app_synth_voice_t *note_map[MAX_TRACK_COUNT][128];  // 记录note->voice
 
-// Caller must hold s_synth_lock -- only called from app_synth_voice_on(),
-// which takes it.
 static app_synth_voice_t *app_synth_voice_alloc() {
     uint8_t min_level_index = 0;
     for (size_t i = 0; i < MAX_VOICE_COUNT; i++)
@@ -47,7 +45,6 @@ static esp_err_t app_synth_voice_free(app_synth_voice_t *voice) {
 }
 
 app_synth_voice_t *app_synth_voice_on(uint8_t track, float freq) {
-    xSemaphoreTake(s_synth_lock, portMAX_DELAY);
 
     app_synth_voice_t *voice = app_synth_voice_alloc();
     if (voice) {
@@ -63,14 +60,11 @@ app_synth_voice_t *app_synth_voice_on(uint8_t track, float freq) {
         voice->from_track->voice_count += 1;
     }
 
-    xSemaphoreGive(s_synth_lock);
     return voice;
 }
 
 esp_err_t app_synth_voice_off(app_synth_voice_t *voice) {
-    xSemaphoreTake(s_synth_lock, portMAX_DELAY);
     esp_err_t err = app_synth_voice_free(voice);
-    xSemaphoreGive(s_synth_lock);
     return err;
 }
 

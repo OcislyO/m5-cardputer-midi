@@ -97,7 +97,8 @@ $<TARGET_FILE:__idf_sys_audio>
 $<TARGET_FILE:__idf_drv_tca8418>
 $<TARGET_FILE:__idf_sys_kbd>
 $<TARGET_FILE:__idf_app_ui>
-$<TARGET_FILE:__idf_app_midi>
+$<TARGET_FILE:__idf_app_event_bus>
+$<TARGET_FILE:__idf_app_midi_kbd>
 $<TARGET_FILE:__idf_app_synth>
 $<TARGET_FILE:__idf_app_seq>
 $<TARGET_FILE:__idf_app_core>

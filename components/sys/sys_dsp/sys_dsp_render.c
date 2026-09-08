@@ -40,26 +40,31 @@ esp_err_t sys_dsp_render(ui_obj_t *obj)
 // (origin_x, origin_y) is obj's parent's absolute origin, since obj->rect is
 // relative to it; obj->next shares that same origin (it's a sibling, under
 // the same parent), while obj->child's origin becomes obj's own absolute
-// position.
+// position. An invalid obj is skipped along with its whole subtree (but not
+// its siblings) -- same as a hidden node, nothing of it or its descendants
+// reaches the screen.
 static void sys_dsp_paint_node(ui_obj_t *obj, rect_t *band, int16_t origin_x, int16_t origin_y)
 {
     if (obj == NULL) {
         return;
     }
 
-    rect_t abs_rect = {
-        .x = (int16_t)(origin_x + obj->rect.x),
-        .y = (int16_t)(origin_y + obj->rect.y),
-        .w = obj->rect.w,
-        .h = obj->rect.h,
-    };
+    if (!obj->invalid) {
+        rect_t abs_rect = {
+            .x = (int16_t)(origin_x + obj->rect.x),
+            .y = (int16_t)(origin_y + obj->rect.y),
+            .w = obj->rect.w,
+            .h = obj->rect.h,
+        };
 
-    rect_t clip;
-    if (obj->draw != NULL && sys_dsp_clip(&clip, &abs_rect, band)) {
-        obj->draw(obj, &abs_rect, band);
+        rect_t clip;
+        if (obj->draw != NULL && sys_dsp_clip(&clip, &abs_rect, band)) {
+            obj->draw(obj, &abs_rect, band);
+        }
+
+        sys_dsp_paint_node(obj->child, band, abs_rect.x, abs_rect.y);
     }
 
-    sys_dsp_paint_node(obj->child, band, abs_rect.x, abs_rect.y);
     sys_dsp_paint_node(obj->next, band, origin_x, origin_y);
 }
 

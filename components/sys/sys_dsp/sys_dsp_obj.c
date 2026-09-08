@@ -72,6 +72,7 @@ static ui_obj_t *sys_dsp_obj_alloc(ui_obj_t *parent, rect_t rect, ui_obj_class_t
         return NULL;
     }
 
+    obj->invalid = false;
     obj->rect = rect;
     obj->kind = kind;
     obj->ctx = ctx;
@@ -98,7 +99,11 @@ static ui_obj_t *sys_dsp_obj_alloc(ui_obj_t *parent, rect_t rect, ui_obj_class_t
 }
 
 // Unions obj's absolute rect and its whole descendant subtree (children,
-// grandchildren, ...) into *out -- NOT obj's siblings. Caller must hold
+// grandchildren, ...) into *out -- NOT obj's siblings. obj itself is always
+// included regardless of obj->invalid (callers that care about obj's own
+// flag check it before calling); a child with invalid set is skipped along
+// with its whole subtree, mirroring sys_dsp_paint_node so the bbox never
+// covers area that render doesn't actually paint. Caller must hold
 // s_tree_lock and pass *first = true on the outermost call.
 static void sys_dsp_obj_bbox(ui_obj_t *obj, rect_t *out, bool *first)
 {
@@ -112,7 +117,9 @@ static void sys_dsp_obj_bbox(ui_obj_t *obj, rect_t *out, bool *first)
     }
 
     for (ui_obj_t *child = obj->child; child != NULL; child = child->next) {
-        sys_dsp_obj_bbox(child, out, first);
+        if (!child->invalid) {
+            sys_dsp_obj_bbox(child, out, first);
+        }
     }
 }
 
@@ -153,8 +160,12 @@ void sys_dsp_obj_unregister(ui_obj_t *obj)
         if (*link == obj) {
             *link = obj->next;
         }
-        bool first = true;
-        sys_dsp_obj_bbox(obj, &bbox, &first);
+        // An invalid obj (and its subtree) was never painted, so nothing
+        // needs repainting when it's removed -- bbox stays zeroed.
+        if (!obj->invalid) {
+            bool first = true;
+            sys_dsp_obj_bbox(obj, &bbox, &first);
+        }
     } else if (s_active_root == obj) {
         // Roots aren't linked into any parent's child list -- the only
         // reference to one is s_active_root, if it's the selected one.
@@ -185,20 +196,51 @@ esp_err_t sys_dsp_obj_move(ui_obj_t *obj, int16_t x, int16_t y)
     bool first;
 
     xSemaphoreTake(s_tree_lock, portMAX_DELAY);
-    first = true;
-    sys_dsp_obj_bbox(obj, &old_bbox, &first);
+    // An invalid obj isn't painted at either position, so both boxes stay
+    // zeroed and no repaint is triggered.
+    if (!obj->invalid) {
+        first = true;
+        sys_dsp_obj_bbox(obj, &old_bbox, &first);
+    }
 
     obj->rect.x = x;
     obj->rect.y = y;
 
-    first = true;
-    sys_dsp_obj_bbox(obj, &new_bbox, &first);
+    if (!obj->invalid) {
+        first = true;
+        sys_dsp_obj_bbox(obj, &new_bbox, &first);
+    }
     xSemaphoreGive(s_tree_lock);
 
     // obj's whole subtree moved along with it (descendants are relative to
     // obj), so both the vacated and the new bounding box need repainting.
     sys_dsp_invalidate(old_bbox);
     sys_dsp_invalidate(new_bbox);
+    return ESP_OK;
+}
+
+esp_err_t sys_dsp_obj_set_invalid(ui_obj_t *obj, bool invalid)
+{
+    if (obj == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    // Footprint of obj's subtree as it's painted right now (or would be, if
+    // obj itself weren't the one flipping) -- same area either way, since
+    // going invalid->valid or valid->invalid changes what's drawn there but
+    // not where. obj itself is included unconditionally by sys_dsp_obj_bbox;
+    // only an already-invalid descendant is excluded.
+    rect_t bbox = { 0, 0, 0, 0 };
+
+    xSemaphoreTake(s_tree_lock, portMAX_DELAY);
+    if (obj->invalid != invalid) {
+        obj->invalid = invalid;
+        bool first = true;
+        sys_dsp_obj_bbox(obj, &bbox, &first);
+    }
+    xSemaphoreGive(s_tree_lock);
+
+    sys_dsp_invalidate(bbox);
     return ESP_OK;
 }
 

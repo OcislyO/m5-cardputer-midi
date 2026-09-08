@@ -1,8 +1,9 @@
 #include "app_synth.h"
 #include "app_synth_track.h"
 #include "app_synth_voice.h"
-#include "app_synth_priv.h"
-#include "app_midi_bus.h"
+#include "app_event_bus.h"
+#include "app_midi_kbd.h"
+#include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include <math.h>
 #include <stdbool.h>
@@ -10,15 +11,12 @@
 #include <string.h>
 
 
-#define APP_SYNTH_TASK_STACK 3072
-#define APP_SYNTH_TASK_PRIO  5
-
 #define APP_SYNTH_ENGINE_TASK_STACK 3072
 #define APP_SYNTH_ENGINE_TASK_PRIO  4
 
+app_synth_app_t app_synth_app;
 
 static int16_t s_wavetables[APP_SYNTH_WAVE_COUNT][APP_SYNTH_WT_SIZE];
-static bool s_initialized = false;
 
 app_synth_voice_t *note_map[MAX_TRACK_COUNT][128];  // 记录note->voice
 
@@ -26,21 +24,134 @@ sys_audio_frame_t app_synth_frame;
 
 QueueHandle_t app_synth_midi_queue;
 
-SemaphoreHandle_t s_synth_lock;
+static esp_err_t app_synth_init(app_t *app);
+static esp_err_t app_synth_start(app_t *app);
+static esp_err_t app_synth_stop(app_t *app);
+static size_t app_synth_get_state(struct app_s *app, int state, void *out, uint8_t size);
+static esp_err_t app_synth_command(app_t *app, int16_t command, ...);
 
-static void app_synth_task(void *arg);
+static void app_synth_wavetable_generate(void);
+
+TaskHandle_t app_synth_engine_task_handle;
 static void app_synth_engine_task(void *arg);
 
-esp_err_t app_synth_init(void)
-{
-    esp_err_t ret = ESP_OK;
-    if (s_initialized)
-        return ret;
+app_t *app_synth_app_init() {
+    app_synth_app.base.state = APP_STATE_UNINIT;
+    app_synth_app.base.id = APP_ID_SYNTH;
+    app_synth_app.base.ctx = &app_synth_app;
+    app_synth_app.base.init = app_synth_init;
+    app_synth_app.base.start = app_synth_start;
+    app_synth_app.base.stop = app_synth_stop;
+    app_synth_app.base.get_state = app_synth_get_state;
+    app_synth_app.base.command = app_synth_command;
+    return &app_synth_app.base;
+}
 
-    ret = sys_audio_init();
-    if (ret)
-        return ret;
+static esp_err_t app_synth_init(app_t *app) {
+    esp_err_t err = ESP_OK;
+    if (app->state != APP_STATE_UNINIT)
+        goto ret;
 
+    err = sys_audio_init();
+    if (err)
+        goto ret;
+
+    app_synth_wavetable_generate();
+
+    memset(note_map, 0, sizeof(note_map));
+
+    app_synth_track_init();
+
+    app_synth_midi_queue = xQueueCreate(10, sizeof(app_event_midi_t));
+    if (! app_synth_midi_queue) {
+        err =  ESP_ERR_NO_MEM;
+        goto ret;
+    }
+
+    app->state = APP_STATE_STOPED;
+
+    ret:
+        return err;
+}
+
+static esp_err_t app_synth_start(app_t *app) {
+    esp_err_t err = ESP_OK;
+    if (app->state != APP_STATE_STOPED)
+    {
+        err = ESP_ERR_INVALID_STATE;
+        goto ret;
+    }
+
+    if (xTaskCreate(app_synth_engine_task, "app_synth_engine", APP_SYNTH_ENGINE_TASK_STACK, NULL, APP_SYNTH_ENGINE_TASK_PRIO, &app_synth_engine_task_handle) != pdPASS) {
+        err =  ESP_ERR_NO_MEM;
+    }
+
+    ret:
+        return err;
+}
+
+static esp_err_t app_synth_stop(app_t *app) {
+    esp_err_t err = ESP_OK;
+    if (app->state != APP_STATE_RUNNING)
+    {
+        err = ESP_ERR_INVALID_STATE;
+        goto ret;
+    }
+
+    vTaskDelete(app_synth_engine_task_handle);  // 暂时使用强制删除占位后期完善退出逻辑
+    
+
+    ret:
+        return err;
+}
+
+static size_t app_synth_get_state(struct app_s *app, int state, void *out, uint8_t size) {
+    size_t bytes = 0;
+
+    if (app->id != app_synth_app.base.id)
+        return bytes;
+
+    if (state >= APP_SYNTH_STATE_MAX || state < 0)
+        return bytes;
+
+    switch (state)
+    {
+    case APP_SYNTH_FLAG:
+        bytes = sizeof(app_synth_app.state.flag);
+        if (size < bytes)
+            bytes = size;
+        memcpy(out, &app_synth_app.state.flag, bytes);
+        break;
+    
+    default:
+        break;
+    }
+    return bytes;
+}
+
+static esp_err_t app_synth_command(app_t *app, int16_t command, ...) {
+    esp_err_t err = ESP_OK;
+    va_list args;
+    va_start(args, command);
+
+    const app_synth_cmd_id_t cmd = (app_synth_cmd_id_t)command;
+
+    switch (cmd)
+    {
+    case APP_SYNTH_SET_ENV:
+        /* code */
+        break;
+    
+    default:
+        break;
+    }
+
+    va_end(args);
+
+    return err;
+}
+
+static void app_synth_wavetable_generate(void) {
     for (size_t i = 0; i < APP_SYNTH_WT_SIZE; i++) {
         float phase = (float)i / APP_SYNTH_WT_SIZE; // 0..1 through one cycle
 
@@ -55,33 +166,6 @@ esp_err_t app_synth_init(void)
 
         s_wavetables[APP_SYNTH_WAVE_SQUARE][i] = (phase < 0.5f) ? INT16_MAX : -INT16_MAX;
     }
-
-    memset(note_map, 0, sizeof(note_map));
-
-    app_synth_track_init();
-
-    s_synth_lock = xSemaphoreCreateMutex();
-    if (! s_synth_lock) {
-        return ESP_ERR_NO_MEM;
-    }
-
-    app_synth_midi_queue = xQueueCreate(10, sizeof(app_midi_event_t));
-    if (! app_synth_midi_queue) {
-        return ESP_ERR_NO_MEM;
-    }
-
-    if (xTaskCreate(app_synth_task, "app_synth", APP_SYNTH_TASK_STACK, NULL,
-                     APP_SYNTH_TASK_PRIO, NULL) != pdPASS) {
-        return ESP_ERR_NO_MEM;
-    }
-
-    if (xTaskCreate(app_synth_engine_task, "app_synth_engine", APP_SYNTH_ENGINE_TASK_STACK, NULL,
-                     APP_SYNTH_ENGINE_TASK_PRIO, NULL) != pdPASS) {
-        return ESP_ERR_NO_MEM;
-    }
-
-    s_initialized = true;
-    return ESP_OK;
 }
 
 int16_t app_synth_wavetable_sample(app_synth_wave_t wave, uint32_t phase)
@@ -96,16 +180,14 @@ int16_t app_synth_wavetable_sample(app_synth_wave_t wave, uint32_t phase)
     return a + (((b - a) * frac) >> 8);
 }
 
-static void app_synth_task(void *arg) {
-    app_midi_event_t event;
+static void app_synth_event_receive(void) {
+    app_event_midi_t event;
     app_synth_voice_t *voice;
     float freq;
 
-    app_midi_bus_subscribe(app_synth_midi_queue);
-
-    for (;;)
+    while (xQueueReceive(app_synth_midi_queue, &event, 0))  // 收到数据继续接收，没收到返回pdfalse退出循环
     {
-        xQueueReceive(app_synth_midi_queue, &event, portMAX_DELAY);
+        
         if (event.channel >= MAX_TRACK_COUNT)
         {
             continue;
@@ -133,9 +215,12 @@ static void app_synth_task(void *arg) {
 static void app_synth_engine_task(void *arg) {
     app_synth_voice_t *voice;
     int16_t sample;
+
+    app_event_bus_subscribe(EVENT_MIDI_NOTE, app_synth_midi_queue);
+
     for (;;)
     {
-        xSemaphoreTake(s_synth_lock, portMAX_DELAY);
+        app_synth_event_receive();
         for (size_t i = 0; i < SYS_AUDIO_FRAME_SAMPLES; i++)
         {
             for (size_t j = 0; j < MAX_VOICE_COUNT; j++)
@@ -161,7 +246,6 @@ static void app_synth_engine_task(void *arg) {
                 temp = -32768;
             app_synth_frame.samples[i] = (uint16_t)temp;
         }
-        xSemaphoreGive(s_synth_lock);
 
         sys_audio_mix(app_synth_frame.samples);
         memset(app_synth_frame.samples, 0, 512);

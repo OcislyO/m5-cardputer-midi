@@ -97,7 +97,8 @@
 /home/alrescha/esp32/projects/m5_midi/build/esp-idf/drv_tca8418/libdrv_tca8418.a
 /home/alrescha/esp32/projects/m5_midi/build/esp-idf/sys_kbd/libsys_kbd.a
 /home/alrescha/esp32/projects/m5_midi/build/esp-idf/app_ui/libapp_ui.a
-/home/alrescha/esp32/projects/m5_midi/build/esp-idf/app_midi/libapp_midi.a
+/home/alrescha/esp32/projects/m5_midi/build/esp-idf/app_event_bus/libapp_event_bus.a
+/home/alrescha/esp32/projects/m5_midi/build/esp-idf/app_midi_kbd/libapp_midi_kbd.a
 /home/alrescha/esp32/projects/m5_midi/build/esp-idf/app_synth/libapp_synth.a
 /home/alrescha/esp32/projects/m5_midi/build/esp-idf/app_seq/libapp_seq.a
 /home/alrescha/esp32/projects/m5_midi/build/esp-idf/app_core/libapp_core.a

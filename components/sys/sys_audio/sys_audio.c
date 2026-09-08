@@ -36,7 +36,7 @@ esp_err_t sys_audio_init(void)
     }
 
     s_initialized = true;
-    vTaskDelay(pdMS_TO_TICKS(1000));
+
     ESP_LOGI(TAG, "audio init done (rate=%dHz volume=%d%% frame=%d samples)", CONFIG_SYS_AUDIO_SAMPLE_RATE_HZ,
              CONFIG_SYS_AUDIO_DEFAULT_VOLUME_PCT, SYS_AUDIO_FRAME_SAMPLES);
     return ESP_OK;

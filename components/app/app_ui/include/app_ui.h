@@ -1,19 +1,39 @@
 #pragma once
 
 #include "esp_err.h"
+#include "app.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/**
- * @brief Test screen: brings up the display, renders a full-screen
- *        solid-color window with a "Hello World" text box on top, and starts
- *        a background task that bounces a small box around the screen to
- *        exercise sys_dsp's dirty-rect renderer.
- */
-esp_err_t app_ui_start(void);
-esp_err_t app_ui_midi_start(void);
+typedef struct app_ui_state_s {
+    uint8_t oct;
+} app_ui_state_t;
+
+typedef enum {
+    APP_UI_OCT = 0,
+    APP_UI_STATE_MAX
+} app_ui_state_id_t;
+
+typedef enum {
+    APP_UI_SET_OCT = 0,
+    APP_UI_SET_KEY,
+    APP_UI_CMD_MAX
+} app_ui_cmd_id_t;
+
+typedef struct app_ui_cmd_s {
+    app_ui_cmd_id_t cmd;
+    void *arg;
+} app_ui_cmd_t;
+
+typedef struct app_ui_app_s {
+    app_t base;
+    app_ui_state_t state;
+} app_ui_app_t;
+
+
+app_t *app_ui_app_init(void);
 
 #ifdef __cplusplus
 }

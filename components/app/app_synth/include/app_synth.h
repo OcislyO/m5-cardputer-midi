@@ -2,6 +2,7 @@
 
 #include "esp_err.h"
 #include "sys_audio.h"
+#include "app.h"
 #include <stdint.h>
 
 #ifdef __cplusplus
@@ -13,6 +14,27 @@ extern "C" {
 #define APP_SYNTH_WT_SIZE      256 // samples per waveform cycle, a power of 2
 #define APP_SYNTH_WT_FRAC_BITS 24  // low bits of a 32-bit phase used to interpolate between table entries; the remaining 8 = log2(APP_SYNTH_WT_SIZE) index the table
 
+typedef struct app_synth_state_s {
+    uint8_t flag;
+} app_synth_state_t;
+
+typedef enum {
+    APP_SYNTH_FLAG = 0,
+    APP_SYNTH_STATE_MAX
+} app_synth_state_id_t;
+
+typedef enum {
+    APP_SYNTH_SET_ENV = 0,
+    APP_SYNTH_SET_ALGORITHM,
+    APP_SYNTH_SET_TRACK_WAVE,
+    APP_SYNTH_CMD_MAX
+} app_synth_cmd_id_t;
+
+typedef struct app_synth_app_s {
+    app_t base;
+    app_synth_state_t state;
+} app_synth_app_t;
+
 typedef enum {
     APP_SYNTH_WAVE_SINE = 0,
     APP_SYNTH_WAVE_TRIANGLE,
@@ -21,12 +43,8 @@ typedef enum {
     APP_SYNTH_WAVE_COUNT,
 } app_synth_wave_t;
 
-/**
- * @brief Bring up the synth engine: fills the four built-in wavetables
- *        (sine, triangle, sawtooth, square) used as oscillator sources.
- *        Idempotent: safe to call again after the first successful call.
- */
-esp_err_t app_synth_init(void);
+
+app_t *app_synth_app_init(void);
 
 /**
  * @brief Linearly-interpolated wavetable lookup. `phase` is a Q8.24
