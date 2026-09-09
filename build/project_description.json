@@ -1,7 +1,7 @@
 {
     "version":            "1.2",
     "project_name":       "m5_midi",
-    "project_version":    "9d1c95d-dirty",
+    "project_version":    "0ce5df9-dirty",
     "project_path":       "/home/alrescha/esp32/projects/m5_midi",
     "idf_path":           "/home/alrescha/esp32/esp-idf",
     "build_dir":          "/home/alrescha/esp32/projects/m5_midi/build",

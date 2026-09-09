@@ -13,20 +13,20 @@ esp_err_t app_synth_env_set (app_synth_env_t *env, float A, float D, float S, fl
     return ESP_OK;
 }
 
-void app_synth_env_update (app_synth_voice_t *voice) {
-    switch (voice->env_state)
+void app_synth_env_update (app_synth_op_t *op) {
+    switch (op->env_state)
     {
     case env_state_attack:
-        voice->level += voice->from_track->env.attack;
-        if (voice->level > 1)
-            voice->env_state = env_state_decay;
+        op->env_level += op->env->attack;
+        if (op->env_level > 1)
+            op->env_state = env_state_decay;
         break;
         
     case env_state_decay:
-        voice->level -= voice->from_track->env.decay;
-        if (voice->level <= voice->from_track->env.sustain) {
-            voice->level = voice->from_track->env.sustain;
-            voice->env_state = env_state_sustain;
+        op->env_level -= op->env->decay;
+        if (op->env_level <= op->env->sustain) {
+            op->env_level = op->env->sustain;
+            op->env_state = env_state_sustain;
         }
             
         break;
@@ -36,11 +36,10 @@ void app_synth_env_update (app_synth_voice_t *voice) {
         break;
         
     case env_state_release:
-        voice->level -= voice->from_track->env.release;
-        if (voice->level <= 0) {
-            voice->level = 0;
-            voice->env_state = env_state_idle;  // 标记为以释放
-            voice->from_track->voice_count -= 1;
+        op->env_level -= op->env->release;
+        if (op->env_level <= 0) {
+            op->env_level = 0;
+            op->env_state = env_state_idle;  // 标记为以释放
         }
         break;
     

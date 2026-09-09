@@ -9,7 +9,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <string.h>
-
+#include "esp_log.h"
 
 #define APP_SYNTH_ENGINE_TASK_STACK 3072
 #define APP_SYNTH_ENGINE_TASK_PRIO  4
@@ -214,41 +214,47 @@ static void app_synth_event_receive(void) {
 
 static void app_synth_engine_task(void *arg) {
     app_synth_voice_t *voice;
-    int16_t sample;
+    int32_t sample[MAX_TRACK_COUNT];
+    uint32_t tick = 0;
 
     app_event_bus_subscribe(EVENT_MIDI_NOTE, app_synth_midi_queue);
 
     for (;;)
     {
         app_synth_event_receive();
-        for (size_t i = 0; i < SYS_AUDIO_FRAME_SAMPLES; i++)
+        tick = xTaskGetTickCount();
+        for (size_t frame_index = 0; frame_index < SYS_AUDIO_FRAME_SAMPLES; frame_index++)
         {
-            for (size_t j = 0; j < MAX_VOICE_COUNT; j++)
+            for (size_t voice_index = 0; voice_index < MAX_VOICE_COUNT; voice_index++)
             {
-                voice = &app_synth_voice_pool[j];
+                voice = &app_synth_voice_pool[voice_index];
 
-                if (voice->env_state == env_state_idle)
+                if (voice->state == VOICE_STATE_FREE)
                     continue;
 
-                app_synth_env_update(voice);
-
-                if (voice->level)
-                {
-                    sample += app_synth_voice_sample(voice) * voice->level;
-                }
+                sample[voice->from_track->midi_channel] += app_synth_voice_sample(voice);
             }
-            int32_t temp = app_synth_frame.samples[i] + sample;
-            sample = 0;
+
+            int32_t temp = 0;
+            for (size_t track_index = 0; track_index < MAX_TRACK_COUNT; track_index++)
+            {
+                temp += sample[track_index] * track_list[track_index].voice_level;
+                sample[track_index] = 0;
+            }
+
             if (temp > 0x7fff)
                 temp = 0x7fff;
 
             if (temp < -32768)
                 temp = -32768;
-            app_synth_frame.samples[i] = (uint16_t)temp;
+
+            app_synth_frame.samples[frame_index] = (int16_t)temp;
         }
 
         sys_audio_mix(app_synth_frame.samples);
         memset(app_synth_frame.samples, 0, 512);
+        ESP_LOGI("eg", "%ld", xTaskGetTickCount() - tick);
+        
         sys_audio_send_frame();
     }
 }

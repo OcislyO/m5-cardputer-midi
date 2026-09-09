@@ -12,15 +12,20 @@ extern "C" {
 
 #define MAX_VOICE_COUNT     20
 
+typedef enum {
+    VOICE_STATE_FREE = 0,   // 没有被占用
+    VOICE_STATE_ON,         // 被触发中
+    VOICE_STATE_OFF,        // 正在release
+} voice_state_t;
+
 typedef struct app_synth_voice_s
 {
     app_synth_track_t *from_track;
-    app_synth_op_t op[6];
+    app_synth_op_t op[MAX_OPERATOR_COUNT];
 
-    app_synth_osc_t osc;
-    
-    app_synth_env_state env_state;
-    float level;
+    float freq;
+
+    voice_state_t state;
 } app_synth_voice_t;
 
 extern app_synth_voice_t app_synth_voice_pool[MAX_VOICE_COUNT];
