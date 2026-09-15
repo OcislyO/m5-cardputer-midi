@@ -27,6 +27,12 @@ typedef struct
 extern app_synth_track_t track_list[MAX_TRACK_COUNT];
 
 esp_err_t app_synth_track_init(void);
+esp_err_t app_synth_track_set_level(uint8_t track_id, float level);
+esp_err_t app_synth_track_set_op_wave(uint8_t track_id, uint8_t op_id, uint8_t wave);
+esp_err_t app_synth_track_set_op_level(uint8_t track_id, uint8_t op_id, float level);
+esp_err_t app_synth_track_set_op_coarse(uint8_t track_id, uint8_t op_id, uint8_t coarse);
+esp_err_t app_synth_track_set_op_env(uint8_t track_id, uint8_t op_id, float A, float D, float S, float R);
+esp_err_t app_synth_track_set_op_algorithm(uint8_t track_id, uint8_t carrier_id, uint8_t modulater_id, uint8_t flag);
 
 #ifdef __cplusplus
 }

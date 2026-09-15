@@ -1,0 +1,24 @@
+menu "APP WEB"
+
+    config APP_WEB_PORT
+        int "HTTP server port"
+        range 1 65535
+        default 80
+
+    config APP_WEB_TASK_STACK
+        int "HTTP server task stack (bytes)"
+        range 2048 16384
+        default 5120
+        help
+            Needs headroom for JSON parsing once the API handlers are wired to
+            app_synth.
+
+    config APP_WEB_MAX_SOCKETS
+        int "Max concurrent connections"
+        range 1 7
+        default 4
+        help
+            Kept below CONFIG_LWIP_MAX_SOCKETS so other sockets (MIDI over
+            network, OTA, ...) still have room.
+
+endmenu

@@ -24,9 +24,12 @@ typedef enum {
 } app_synth_state_id_t;
 
 typedef enum {
-    APP_SYNTH_SET_ENV = 0,
+    APP_SYNTH_SET_LEVEL = 0,
+    APP_SYNTH_SET_OP_WAVE,
+    APP_SYNTH_SET_OP_LEVEL,
+    APP_SYNTH_SET_OP_COARSE,
+    APP_SYNTH_SET_OP_ENV,
     APP_SYNTH_SET_ALGORITHM,
-    APP_SYNTH_SET_TRACK_WAVE,
     APP_SYNTH_CMD_MAX
 } app_synth_cmd_id_t;
 

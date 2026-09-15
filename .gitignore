@@ -1,0 +1,39 @@
+# ESP-IDF build output
+build/
+managed_components/
+
+# VS Code local settings
+.vscode/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# C/C++ build artifacts
+*.o
+*.obj
+*.a
+*.elf
+*.bin
+*.map
+
+# CMake generated files
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+compile_commands.json
+
+# ESP-IDF local config
+sdkconfig.old
+
+# Logs / temporary files
+*.log
+*.tmp
+*.swp
+*.swo
+*~
+
+# OS junk
+.DS_Store
+Thumbs.db

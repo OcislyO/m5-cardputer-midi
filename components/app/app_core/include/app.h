@@ -43,6 +43,7 @@ extern app_t *ui_app;
 extern app_t *midi_kbd_app;
 extern app_t *synth_app;
 extern app_t *seq_app;
+extern app_t *web_app;
 
 #ifdef __cplusplus
 }

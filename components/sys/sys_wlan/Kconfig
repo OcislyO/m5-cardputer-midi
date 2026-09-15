@@ -1,0 +1,75 @@
+menu "SYS WLAN"
+
+    config SYS_WLAN_STA_SSID
+        string "Fallback station SSID"
+        default ""
+        help
+            Used by sys_wlan_connect_saved() when NVS holds no credentials yet.
+            Leave empty to require provisioning (web page / sys_wlan_connect()).
+
+    config SYS_WLAN_STA_PASSWORD
+        string "Fallback station password"
+        default ""
+        help
+            Password for SYS_WLAN_STA_SSID. Empty means an open network.
+
+    config SYS_WLAN_MAX_RETRY
+        int "Station reconnect attempts"
+        range 0 100
+        default 5
+        help
+            How many times to retry before reporting the connection as failed.
+            0 retries forever.
+
+    config SYS_WLAN_RECONNECT_DELAY_MS
+        int "Delay between reconnect attempts (ms)"
+        range 100 60000
+        default 2000
+
+    config SYS_WLAN_HOSTNAME
+        string "Hostname / DHCP client name"
+        default "cardputer"
+
+    config SYS_WLAN_AP_SSID
+        string "SoftAP SSID prefix"
+        default "Cardputer"
+        help
+            sys_wlan_ap_start(NULL, ...) appends the last two MAC bytes, e.g.
+            "Cardputer-3A7C", so several boards can coexist.
+
+    config SYS_WLAN_AP_PASSWORD
+        string "SoftAP password"
+        default ""
+        help
+            Used by sys_wlan_auto_connect()'s fallback AP. Empty means an open
+            AP; otherwise at least 8 characters (WPA2 minimum).
+
+    config SYS_WLAN_AP_CHANNEL
+        int "SoftAP channel"
+        range 1 13
+        default 1
+
+    config SYS_WLAN_AP_MAX_CONN
+        int "SoftAP max simultaneous clients"
+        range 1 10
+        default 4
+
+    config SYS_WLAN_AP_AUTO_STOP_MS
+        int "Auto-stop SoftAP delay after station connects (ms)"
+        range 0 60000
+        default 5000
+        help
+            When the station obtains an IP while the SoftAP is running, the
+            SoftAP is stopped after this delay. The grace period lets a
+            provisioning page show the result before the client's hotspot
+            link drops. 0 keeps the AP running.
+
+    config SYS_WLAN_MAX_EVENT_CBS
+        int "Max registered event callbacks"
+        range 1 8
+        default 4
+        help
+            Size of the fixed callback table used by
+            sys_wlan_register_event_cb() (UI, web server, ...).
+
+endmenu

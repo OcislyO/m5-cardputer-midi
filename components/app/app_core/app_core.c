@@ -7,22 +7,27 @@
 #include "sys_dsp.h"
 #include "sys_bat.h"
 #include "sys_audio.h"
+#include "sys_usb.h"
+#include "sys_wlan.h"
 #include "app_ui.h"
 #include "app_event_bus.h"
 #include "app_midi_kbd.h"
 #include "app_synth.h"
 #include "app_seq.h"
+#include "app_web.h"
 #include "freertos/task.h"
 
 static const char *TAG = "app";
 
 #define APP_CORE_SCALE_NOTE_MS 300
 #define APP_CORE_SCALE_VELOCITY 100
+#define APP_CORE_WLAN_TIMEOUT_MS 15000
 
 app_t *ui_app;
 app_t *midi_kbd_app;
 app_t *synth_app;
 app_t *seq_app;
+app_t *web_app;
 
 // One-shot demo: plays a C major scale (C4-C5) by publishing directly to the
 // MIDI bus, to exercise app_synth's own bus subscription end to end without
@@ -56,6 +61,7 @@ void app_start(void)
     ESP_ERROR_CHECK(sys_dsp_init());
     ESP_ERROR_CHECK(sys_bat_init());
     ESP_ERROR_CHECK(sys_audio_init());
+    // ESP_ERROR_CHECK(sys_usb_init());
 
     // app_synth, app_midi_event, and app_seq are independent consumers/
     // producers on the MIDI bus -- none of them know about each other, so
@@ -78,6 +84,28 @@ void app_start(void)
     seq_app = app_seq_app_init();
     ESP_ERROR_CHECK(seq_app->init(seq_app));
     ESP_ERROR_CHECK(seq_app->start(seq_app));
+
+    // Radio and web UI come up last: the keyboard and synth should already be
+    // playable, and app_web only needs an address by the time it logs its URL.
+    ESP_ERROR_CHECK(sys_wlan_init());
+    // With no stored credentials (and no CONFIG_SYS_WLAN_STA_SSID) this falls
+    // straight through to the "Cardputer-XXXX" softap, so the page is always
+    // reachable -- a failure here still leaves the instrument usable.
+    esp_err_t wlan_err = sys_wlan_auto_connect(APP_CORE_WLAN_TIMEOUT_MS, true);
+    if (wlan_err != ESP_OK) {
+        ESP_LOGW(TAG, "wlan not up: %s", esp_err_to_name(wlan_err));
+    }
+
+    // Same reasoning as the radio: a Cardputer that cannot serve the page is
+    // still an instrument, so don't take the whole app down with it.
+    web_app = app_web_app_init();
+    esp_err_t web_err = web_app->init(web_app);
+    if (web_err == ESP_OK) {
+        web_err = web_app->start(web_app);
+    }
+    if (web_err != ESP_OK) {
+        ESP_LOGW(TAG, "web ui not started: %s", esp_err_to_name(web_err));
+    }
 
     vTaskDelay(pdMS_TO_TICKS(300));
     xTaskCreate(app_core_scale_demo_task, "app_core_scale_demo", 2048, NULL, 3, NULL);

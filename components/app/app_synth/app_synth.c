@@ -131,15 +131,57 @@ static size_t app_synth_get_state(struct app_s *app, int state, void *out, uint8
 
 static esp_err_t app_synth_command(app_t *app, int16_t command, ...) {
     esp_err_t err = ESP_OK;
+    int track, op;
     va_list args;
     va_start(args, command);
 
     const app_synth_cmd_id_t cmd = (app_synth_cmd_id_t)command;
-
+    
     switch (cmd)
     {
-    case APP_SYNTH_SET_ENV:
-        /* code */
+    case APP_SYNTH_SET_LEVEL:
+        track = va_arg(args, int);
+        float level = (float)va_arg(args, double);
+        app_synth_track_set_level(track, level);
+        break;
+    
+    case APP_SYNTH_SET_OP_WAVE:
+        track = va_arg(args, int);
+        op = va_arg(args, int);
+        uint8_t wave = (uint8_t)va_arg(args, int);
+        app_synth_track_set_op_wave(track, op, wave);
+        break;
+    
+    case APP_SYNTH_SET_OP_LEVEL:
+        track = va_arg(args, int);
+        op = va_arg(args, int);
+        float op_level = (float)va_arg(args, double);
+        app_synth_track_set_op_level(track, op, op_level);
+        break;
+    
+    case APP_SYNTH_SET_OP_COARSE:
+        track = va_arg(args, int);
+        op = va_arg(args, int);
+        uint8_t coarse = (uint8_t)va_arg(args, int);
+        app_synth_track_set_op_coarse(track, op, coarse);
+        break;
+    
+    case APP_SYNTH_SET_OP_ENV:
+        track = va_arg(args, int);
+        op = va_arg(args, int);
+        float A = (float)va_arg(args, double);
+        float D = (float)va_arg(args, double);
+        float S = (float)va_arg(args, double);
+        float R = (float)va_arg(args, double);
+        app_synth_track_set_op_env(track, op, A, D, S, R);
+        break;
+    
+    case APP_SYNTH_SET_ALGORITHM:
+        track = va_arg(args, int);
+        uint8_t carrier = (uint8_t)va_arg(args, int);
+        uint8_t modulater = (uint8_t)va_arg(args, int);
+        bool flag = (bool)va_arg(args, int);
+        app_synth_track_set_op_algorithm(track, carrier, modulater, flag);
         break;
     
     default:
@@ -253,7 +295,7 @@ static void app_synth_engine_task(void *arg) {
 
         sys_audio_mix(app_synth_frame.samples);
         memset(app_synth_frame.samples, 0, 512);
-        ESP_LOGI("eg", "%ld", xTaskGetTickCount() - tick);
+        // ESP_LOGI("eg", "%ld", xTaskGetTickCount() - tick);
         
         sys_audio_send_frame();
     }
