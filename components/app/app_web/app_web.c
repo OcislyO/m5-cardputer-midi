@@ -21,9 +21,8 @@ app_web_app_t app_web_app;
 static httpd_handle_t s_server;
 
 static esp_err_t app_web_app_init_cb(app_t *app);
-static esp_err_t app_web_start(app_t *app);
-static esp_err_t app_web_stop(app_t *app);
-static size_t app_web_get_state(app_t *app, int state, void *out, uint8_t size);
+static esp_err_t app_web_uninit(app_t *app);
+static size_t app_web_get_state(app_t *app, int16_t state, void *out, uint8_t size);
 static esp_err_t app_web_command(app_t *app, int16_t command, ...);
 
 /* ------------------------------------------------------------------ *
@@ -156,22 +155,10 @@ app_t *app_web_app_init(void)
     app_web_app.base.id = APP_ID_WEB;
     app_web_app.base.ctx = &app_web_app;
     app_web_app.base.init = app_web_app_init_cb;
-    app_web_app.base.start = app_web_start;
-    app_web_app.base.stop = app_web_stop;
+    app_web_app.base.uninit = app_web_uninit;
     app_web_app.base.get_state = app_web_get_state;
     app_web_app.base.command = app_web_command;
     return &app_web_app.base;
-}
-
-static esp_err_t app_web_app_init_cb(app_t *app)
-{
-    if (app->state != APP_STATE_UNINIT) {
-        return ESP_OK;
-    }
-
-    app_web_app.state.running = 0;
-    app->state = APP_STATE_STOPED;
-    return ESP_OK;
 }
 
 // Logs where the page can be reached, on whichever interface sys_wlan has up.
@@ -197,11 +184,13 @@ static void app_web_log_urls(void)
     }
 }
 
-static esp_err_t app_web_start(app_t *app)
+static esp_err_t app_web_app_init_cb(app_t *app)
 {
-    if (app->state != APP_STATE_STOPED) {
-        return ESP_ERR_INVALID_STATE;
+    if (app->state != APP_STATE_UNINIT) {
+        return ESP_OK;
     }
+
+    app_web_app.state.running = 0;
 
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.server_port = CONFIG_APP_WEB_PORT;
@@ -240,7 +229,7 @@ static esp_err_t app_web_start(app_t *app)
     return ESP_OK;
 }
 
-static esp_err_t app_web_stop(app_t *app)
+static esp_err_t app_web_uninit(app_t *app)
 {
     if (app->state != APP_STATE_RUNNING) {
         return ESP_ERR_INVALID_STATE;
@@ -249,11 +238,11 @@ static esp_err_t app_web_stop(app_t *app)
     esp_err_t err = httpd_stop(s_server);
     s_server = NULL;
     app_web_app.state.running = 0;
-    app->state = APP_STATE_STOPED;
+    app->state = APP_STATE_UNINIT;
     return err;
 }
 
-static size_t app_web_get_state(app_t *app, int state, void *out, uint8_t size)
+static size_t app_web_get_state(app_t *app, int16_t state, void *out, uint8_t size)
 {
     size_t bytes = 0;
 

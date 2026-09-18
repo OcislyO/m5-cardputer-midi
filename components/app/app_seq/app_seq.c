@@ -4,12 +4,14 @@
 #include "freertos/task.h"
 #include "freertos/queue.h"
 #include "freertos/semphr.h"
+#include "esp_log.h"
 #include <stdbool.h>
 #include <string.h>
 
 #define APP_SEQ_TASK_STACK 3072
 #define APP_SEQ_TASK_PRIO   3
-#define APP_SEQ_POLL_MS     5
+#define APP_SEQ_POLL_MS     5 // 退出延迟也由它决定：任务最多一个轮询周期就收手
+#define APP_SEQ_TASK_EXIT_TIMEOUT_MS 500
 
 // How many pending MIDI events the shared record subscription can buffer
 // between polls -- generous relative to how fast a human can hit keys.
@@ -50,17 +52,19 @@ typedef struct {
     uint8_t pending_velocity;
 } app_seq_track_t;
 
+static const char *TAG = "app_seq";
+
 app_seq_app_t app_seq_app;
 
 static app_seq_track_t s_seq[APP_SEQ_TRACK_COUNT];
 static SemaphoreHandle_t s_lock;
 static QueueHandle_t s_record_queue;
 static TaskHandle_t s_task_handle;
+static volatile bool s_run; // false = 请求任务退出
 
 static esp_err_t app_seq_init(app_t *app);
-static esp_err_t app_seq_start(app_t *app);
-static esp_err_t app_seq_stop(app_t *app);
-static size_t app_seq_get_state(struct app_s *app, int state, void *out, uint8_t size);
+static esp_err_t app_seq_uninit(app_t *app);
+static size_t app_seq_get_state(struct app_s *app, int16_t state, void *out, uint8_t size);
 static esp_err_t app_seq_command(app_t *app, int16_t command, ...);
 
 static void app_seq_task(void *arg);
@@ -77,8 +81,7 @@ app_t *app_seq_app_init(void)
     app_seq_app.base.id = APP_ID_SEQ;
     app_seq_app.base.ctx = &app_seq_app;
     app_seq_app.base.init = app_seq_init;
-    app_seq_app.base.start = app_seq_start;
-    app_seq_app.base.stop = app_seq_stop;
+    app_seq_app.base.uninit = app_seq_uninit;
     app_seq_app.base.get_state = app_seq_get_state;
     app_seq_app.base.command = app_seq_command;
     return &app_seq_app.base;
@@ -102,13 +105,20 @@ static esp_err_t app_seq_init(app_t *app)
 
     s_record_queue = xQueueCreate(APP_SEQ_RECORD_QUEUE_LEN, sizeof(app_event_midi_t));
     if (! s_record_queue) {
+        vSemaphoreDelete(s_lock);
+        s_lock = NULL;
         err = ESP_ERR_NO_MEM;
         goto ret;
     }
 
     err = app_event_bus_subscribe(EVENT_MIDI_NOTE, s_record_queue);
-    if (err)
+    if (err) {
+        vQueueDelete(s_record_queue);
+        s_record_queue = NULL;
+        vSemaphoreDelete(s_lock);
+        s_lock = NULL;
         goto ret;
+    }
 
     memset(s_seq, 0, sizeof(s_seq));
     for (uint8_t t = 0; t < APP_SEQ_TRACK_COUNT; t++) {
@@ -116,21 +126,13 @@ static esp_err_t app_seq_init(app_t *app)
         s_seq[t].step_interval_ticks = app_seq_step_interval_ticks(APP_SEQ_DEFAULT_BPM);
     }
 
-    app->state = APP_STATE_STOPED;
-
-    ret:
-        return err;
-}
-
-static esp_err_t app_seq_start(app_t *app)
-{
-    esp_err_t err = ESP_OK;
-    if (app->state != APP_STATE_STOPED) {
-        err = ESP_ERR_INVALID_STATE;
-        goto ret;
-    }
-
+    s_run = true;
     if (xTaskCreate(app_seq_task, "app_seq", APP_SEQ_TASK_STACK, NULL, APP_SEQ_TASK_PRIO, &s_task_handle) != pdPASS) {
+        app_event_bus_unsubscribe(EVENT_MIDI_NOTE, s_record_queue);
+        vQueueDelete(s_record_queue);
+        s_record_queue = NULL;
+        vSemaphoreDelete(s_lock);
+        s_lock = NULL;
         err = ESP_ERR_NO_MEM;
         goto ret;
     }
@@ -141,7 +143,7 @@ static esp_err_t app_seq_start(app_t *app)
         return err;
 }
 
-static esp_err_t app_seq_stop(app_t *app)
+static esp_err_t app_seq_uninit(app_t *app)
 {
     esp_err_t err = ESP_OK;
     if (app->state != APP_STATE_RUNNING) {
@@ -149,15 +151,28 @@ static esp_err_t app_seq_stop(app_t *app)
         goto ret;
     }
 
-    vTaskDelete(s_task_handle); // 暂时使用强制删除占位，后期完善退出逻辑
-    s_task_handle = NULL;
-    app->state = APP_STATE_STOPED;
+    s_run = false;
+    if (!app_task_wait_stopped(&s_task_handle, APP_SEQ_TASK_EXIT_TIMEOUT_MS)) {
+        ESP_LOGE(TAG, "任务未退出，保留已分配资源");
+        err = ESP_ERR_TIMEOUT;
+        goto ret;
+    }
+
+    // 顺序重要：任务已经不会再碰队列了，再退订，最后才删，否则总线可能
+    // 往已经释放的队列里塞事件。
+    app_event_bus_unsubscribe(EVENT_MIDI_NOTE, s_record_queue);
+    vQueueDelete(s_record_queue);
+    s_record_queue = NULL;
+    vSemaphoreDelete(s_lock);
+    s_lock = NULL;
+
+    app->state = APP_STATE_UNINIT;
 
     ret:
         return err;
 }
 
-static size_t app_seq_get_state(struct app_s *app, int state, void *out, uint8_t size)
+static size_t app_seq_get_state(struct app_s *app, int16_t state, void *out, uint8_t size)
 {
     size_t bytes = 0;
 
@@ -165,6 +180,11 @@ static size_t app_seq_get_state(struct app_s *app, int state, void *out, uint8_t
         return bytes;
 
     if (state < APP_SEQ_STATE_TRACK_0 || state > APP_SEQ_STATE_TRACK_3)
+        return bytes;
+
+    // 别的 app 的 get_state 只读一个结构体字段，这个要取锁。锁在 uninit 里
+    // 已经被删掉了，万一有人在 UNINIT 状态下还来问，直接当没数据。
+    if (s_lock == NULL)
         return bytes;
 
     uint8_t track = (uint8_t)(state - APP_SEQ_STATE_TRACK_0);
@@ -303,7 +323,7 @@ static void app_seq_task(void *arg)
 {
     app_event_midi_t evt;
 
-    for (;;) {
+    while (s_run) {
         bool have_new_note = false;
         uint8_t new_note = 0, new_velocity = 0;
 
@@ -372,4 +392,22 @@ static void app_seq_task(void *arg)
 
         vTaskDelay(pdMS_TO_TICKS(APP_SEQ_POLL_MS));
     }
+
+    // 退出前把还按着的音关掉，否则这些声部会一直响下去（合成器那边只认
+    // NOTE_OFF）。此刻 app_synth 还在运行，所以这些事件有人接。
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    for (uint8_t t = 0; t < APP_SEQ_TRACK_COUNT; t++) {
+        if (!s_seq[t].note_held) {
+            continue;
+        }
+        app_event_midi_t off = {
+            .type = APP_MIDI_EVENT_NOTE_OFF, .channel = t, .note = s_seq[t].held_note, .velocity = 0
+        };
+        app_event_bus_send(EVENT_MIDI_NOTE, &off);
+        s_seq[t].note_held = false;
+    }
+    xSemaphoreGive(s_lock);
+
+    s_task_handle = NULL;
+    vTaskDelete(NULL);
 }

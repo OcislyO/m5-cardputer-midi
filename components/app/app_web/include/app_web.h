@@ -59,7 +59,7 @@ typedef struct app_web_app_s {
     app_web_state_t state;
 } app_web_app_t;
 
-/** @brief Build the app_t for the web UI. Call init()/start() on it, as with the other apps. */
+/** @brief Build the app_t for the web UI. Call init() on it, as with the other apps. */
 app_t *app_web_app_init(void);
 
 #ifdef __cplusplus

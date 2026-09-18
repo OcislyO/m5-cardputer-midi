@@ -15,16 +15,27 @@ extern "C" {
 #define APP_SYNTH_WT_FRAC_BITS 24  // low bits of a 32-bit phase used to interpolate between table entries; the remaining 8 = log2(APP_SYNTH_WT_SIZE) index the table
 
 typedef struct app_synth_state_s {
-    uint8_t flag;
+    uint8_t master_level;
 } app_synth_state_t;
 
 typedef enum {
-    APP_SYNTH_FLAG = 0,
+    APP_SYNTH_MASTER_LEVEL = 0,
     APP_SYNTH_STATE_MAX
 } app_synth_state_id_t;
 
 typedef enum {
-    APP_SYNTH_SET_LEVEL = 0,
+    APP_SYNTH_GET_TRACK_LEVEL = 0,
+    APP_SYNTH_GET_OP_WAVE,
+    APP_SYNTH_GET_OP_LEVEL,
+    APP_SYNTH_GET_OP_COARSE,
+    APP_SYNTH_GET_OP_ENV,
+    APP_SYNTH_GET_ALGORITHM,
+    APP_SYNTH_DATA_MAX
+} app_synth_data_id_t;
+
+typedef enum {
+    APP_SYNTH_SET_MASTER_LEVEL = 0,
+    APP_SYNTH_SET_TRACK_LEVEL,
     APP_SYNTH_SET_OP_WAVE,
     APP_SYNTH_SET_OP_LEVEL,
     APP_SYNTH_SET_OP_COARSE,
