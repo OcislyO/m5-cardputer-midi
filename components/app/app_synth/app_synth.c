@@ -150,7 +150,7 @@ static size_t app_synth_get_state(struct app_s *app, int16_t state, void *out, u
 
     switch (state)
     {
-    case APP_SYNTH_MASTER_LEVEL:
+    case APP_SYNTH_STATE_MASTER_LEVEL:
         bytes = sizeof(app_synth_app.state.master_level);
         if (size < bytes)
             bytes = size;
@@ -163,6 +163,22 @@ static size_t app_synth_get_state(struct app_s *app, int16_t state, void *out, u
     return bytes;
 }
 
+// 把 track_list[track] 里某个算子参数列表从 op_id 起到末尾拷给 out，最多
+// size 字节：传单个元素大小 = 只读一个算子；op_id 传 0 且 size 传整段大小 =
+// 一次读出整列。注意元素大小按字段的真实类型算（如 op_wave 是枚举，4 字节）。
+static size_t app_synth_get_data_field(const void *list, size_t elem_size, int op_id, void *out, uint8_t size)
+{
+    if (op_id < 0 || (size_t)op_id >= MAX_OPERATOR_COUNT)
+        return 0;
+
+    size_t avail = (MAX_OPERATOR_COUNT - (size_t)op_id) * elem_size;
+    if (size < avail)
+        avail = size;
+
+    memcpy(out, (const uint8_t *)list + (size_t)op_id * elem_size, avail);
+    return avail;
+}
+
 static size_t app_synth_get_data(struct app_s *app, int16_t state, void *out, uint8_t size, ...) {
     size_t bytes = 0;
     int track_id, op_id;
@@ -170,7 +186,7 @@ static size_t app_synth_get_data(struct app_s *app, int16_t state, void *out, ui
     if (app->id != app_synth_app.base.id)
         return bytes;
 
-    if (state >= APP_SYNTH_STATE_MAX || state < 0)
+    if (state >= APP_SYNTH_DATA_MAX || state < 0)
         return bytes;
 
     va_list args;
@@ -178,8 +194,23 @@ static size_t app_synth_get_data(struct app_s *app, int16_t state, void *out, ui
 
     switch (state)
     {
-    case APP_SYNTH_GET_TRACK_LEVEL:
+    case APP_SYNTH_DATA_TRACK:
         track_id = va_arg(args, int);
+        if (track_id < 0 || track_id >= MAX_TRACK_COUNT)
+            break;
+
+        // 整条轨道一次拷走，调用方按 app_synth_track_t 解释
+        bytes = sizeof(track_list[0]);
+        if (size < bytes)
+            bytes = size;
+
+        memcpy(out, &track_list[track_id], bytes);
+        break;
+
+    case APP_SYNTH_DATA_TRACK_LEVEL:
+        track_id = va_arg(args, int);
+        if (track_id < 0 || track_id >= MAX_TRACK_COUNT)
+            break;
 
         bytes = sizeof(track_list[0].voice_level);
         if (size < bytes)
@@ -188,59 +219,54 @@ static size_t app_synth_get_data(struct app_s *app, int16_t state, void *out, ui
         memcpy(out, &track_list[track_id].voice_level, bytes);
         break;
         
-    case APP_SYNTH_GET_OP_WAVE:
+    case APP_SYNTH_DATA_OP_WAVE:
         track_id = va_arg(args, int);
         op_id = va_arg(args, int);
+        if (track_id < 0 || track_id >= MAX_TRACK_COUNT)
+            break;
 
-        bytes = sizeof(track_list[0].op_wave);  // 允许读出整个列表
-        if (size < bytes)
-            bytes = size;
-
-        memcpy(out, &track_list[track_id].op_wave[op_id], bytes);
+        bytes = app_synth_get_data_field(track_list[track_id].op_wave,
+                                         sizeof(track_list[track_id].op_wave[0]), op_id, out, size);
         break;
 
-    case APP_SYNTH_GET_OP_LEVEL:
+    case APP_SYNTH_DATA_OP_LEVEL:
         track_id = va_arg(args, int);
         op_id = va_arg(args, int);
+        if (track_id < 0 || track_id >= MAX_TRACK_COUNT)
+            break;
 
-        bytes = sizeof(track_list[0].op_level);
-        if (size < bytes)
-            bytes = size;
-
-        memcpy(out, &track_list[track_id].op_level[op_id], bytes);
+        bytes = app_synth_get_data_field(track_list[track_id].op_level,
+                                         sizeof(track_list[track_id].op_level[0]), op_id, out, size);
         break;
 
-    case APP_SYNTH_GET_OP_COARSE:
+    case APP_SYNTH_DATA_OP_COARSE:
         track_id = va_arg(args, int);
         op_id = va_arg(args, int);
+        if (track_id < 0 || track_id >= MAX_TRACK_COUNT)
+            break;
 
-        bytes = sizeof(track_list[0].op_coarse);
-        if (size < bytes)
-            bytes = size;
-
-        memcpy(out, &track_list[track_id].op_coarse[op_id], bytes);
+        bytes = app_synth_get_data_field(track_list[track_id].op_coarse,
+                                         sizeof(track_list[track_id].op_coarse[0]), op_id, out, size);
         break;
 
-    case APP_SYNTH_GET_OP_ENV:
+    case APP_SYNTH_DATA_OP_ENV:
         track_id = va_arg(args, int);
         op_id = va_arg(args, int);
+        if (track_id < 0 || track_id >= MAX_TRACK_COUNT)
+            break;
 
-        bytes = sizeof(track_list[0].op_env);
-        if (size < bytes)
-            bytes = size;
-
-        memcpy(out, &track_list[track_id].op_env[op_id], bytes);
+        bytes = app_synth_get_data_field(track_list[track_id].op_env,
+                                         sizeof(track_list[track_id].op_env[0]), op_id, out, size);
         break;
 
-    case APP_SYNTH_GET_ALGORITHM:
+    case APP_SYNTH_DATA_ALGORITHM:
         track_id = va_arg(args, int);
         op_id = va_arg(args, int);
+        if (track_id < 0 || track_id >= MAX_TRACK_COUNT)
+            break;
 
-        bytes = sizeof(track_list[0].fm_metrix);
-        if (size < bytes)
-            bytes = size;
-
-        memcpy(out, &track_list[track_id].fm_metrix[op_id], bytes);
+        bytes = app_synth_get_data_field(track_list[track_id].fm_metrix,
+                                         sizeof(track_list[track_id].fm_metrix[0]), op_id, out, size);
         break;
     
     default:
@@ -262,7 +288,7 @@ static esp_err_t app_synth_command(app_t *app, int16_t command, ...) {
     
     switch (cmd)
     {
-    case APP_SYNTH_SET_MASTER_LEVEL:
+    case APP_SYNTH_CMD_SET_MASTER_LEVEL:
         uint8_t m_level = (uint8_t)va_arg(args, int);
         if (m_level > 100)
             m_level = 100;
@@ -271,34 +297,34 @@ static esp_err_t app_synth_command(app_t *app, int16_t command, ...) {
         sys_audio_set_volume(app_synth_app.state.master_level);
         break;
 
-    case APP_SYNTH_SET_TRACK_LEVEL:
+    case APP_SYNTH_CMD_SET_TRACK_LEVEL:
         track = va_arg(args, int);
         float level = (float)va_arg(args, double);
         app_synth_track_set_level(track, level);
         break;
     
-    case APP_SYNTH_SET_OP_WAVE:
+    case APP_SYNTH_CMD_SET_OP_WAVE:
         track = va_arg(args, int);
         op = va_arg(args, int);
         uint8_t wave = (uint8_t)va_arg(args, int);
         app_synth_track_set_op_wave(track, op, wave);
         break;
     
-    case APP_SYNTH_SET_OP_LEVEL:
+    case APP_SYNTH_CMD_SET_OP_LEVEL:
         track = va_arg(args, int);
         op = va_arg(args, int);
         float op_level = (float)va_arg(args, double);
         app_synth_track_set_op_level(track, op, op_level);
         break;
     
-    case APP_SYNTH_SET_OP_COARSE:
+    case APP_SYNTH_CMD_SET_OP_COARSE:
         track = va_arg(args, int);
         op = va_arg(args, int);
         uint8_t coarse = (uint8_t)va_arg(args, int);
         app_synth_track_set_op_coarse(track, op, coarse);
         break;
     
-    case APP_SYNTH_SET_OP_ENV:
+    case APP_SYNTH_CMD_SET_OP_ENV:
         track = va_arg(args, int);
         op = va_arg(args, int);
         float A = (float)va_arg(args, double);
@@ -308,7 +334,7 @@ static esp_err_t app_synth_command(app_t *app, int16_t command, ...) {
         app_synth_track_set_op_env(track, op, A, D, S, R);
         break;
     
-    case APP_SYNTH_SET_ALGORITHM:
+    case APP_SYNTH_CMD_SET_ALGORITHM:
         track = va_arg(args, int);
         uint8_t carrier = (uint8_t)va_arg(args, int);
         uint8_t modulater = (uint8_t)va_arg(args, int);

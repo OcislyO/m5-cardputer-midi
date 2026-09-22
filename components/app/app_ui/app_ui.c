@@ -1,7 +1,9 @@
 #include "app_ui.h"
+#include "asset.h"
 #include "sys_dsp.h"
 #include "sys_kbd.h"
 #include "sys_bat.h"
+#include "app_web.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_log.h"
@@ -31,7 +33,13 @@ static TaskHandle_t s_kbd_task;
 static ui_obj_t *ui_root;
 static ui_obj_t *bar;
 static ui_obj_t *bar_bat_text;
+static ui_obj_t *bar_ip_text;
 static ui_obj_t *midi_backgraund;
+static ui_obj_t *midi_tool_bar;
+static ui_obj_t *midi_tool_play;
+static ui_obj_t *midi_tool_pause;
+static ui_obj_t *midi_tool_record;
+static ui_obj_t *midi_tool_stop;
 static ui_obj_t *midi_kbd;
 static ui_obj_t *midi__keys[2][14];
 
@@ -85,8 +93,13 @@ static esp_err_t app_ui_init(app_t *app) {
     }
 
     bar_bat_text = sys_dsp_text_register(bar, APP_UI_PANEL_WIDTH - APP_UI_BAT_TEXT_W - APP_UI_BAT_MARGIN,
-                                        APP_UI_BAT_MARGIN, APP_UI_BAT_TEXT_W, 12, "--%", APP_UI_TEXT_COLOR);
+                                        APP_UI_BAT_MARGIN, APP_UI_BAT_TEXT_W, 8, "--%", APP_UI_TEXT_COLOR);
     if (bar_bat_text == NULL) {
+        return ESP_ERR_NO_MEM;
+    }
+
+    bar_ip_text = sys_dsp_text_register(bar, 10, APP_UI_BAT_MARGIN, 6*20, 8, "wifi not connected", APP_UI_TEXT_COLOR);
+    if (bar_ip_text == NULL) {
         return ESP_ERR_NO_MEM;
     }
     
@@ -95,6 +108,38 @@ static esp_err_t app_ui_init(app_t *app) {
     {
         return ESP_ERR_NO_MEM;
     }
+
+    midi_tool_bar = sys_dsp_rect_register(midi_backgraund, 0, 61, 240, 16, 0x6b34);
+    if (midi_tool_bar == NULL)
+    {
+        return ESP_ERR_NO_MEM;
+    }
+
+    midi_tool_play = sys_dsp_icon_register(midi_tool_bar, 4, 2, 16, 12, app_ui_icon_play, 0x07e8);
+    if (midi_tool_play == NULL)
+    {
+        return ESP_ERR_NO_MEM;
+    }
+    
+    midi_tool_pause = sys_dsp_icon_register(midi_tool_bar, 20, 2, 16, 12, app_ui_icon_pause, 0xf9e0);
+    if (midi_tool_pause == NULL)
+    {
+        return ESP_ERR_NO_MEM;
+    }
+
+    midi_tool_record = sys_dsp_icon_register(midi_tool_bar, 36, 2, 16, 12, app_ui_icon_record, 0xfae5);
+    if (midi_tool_record == NULL)
+    {
+        return ESP_ERR_NO_MEM;
+    }
+
+    midi_tool_stop = sys_dsp_icon_register(midi_tool_bar, 36, 2, 16, 12, app_ui_icon_stop, 0xfae5);
+    if (midi_tool_stop == NULL)
+    {
+        return ESP_ERR_NO_MEM;
+    }
+
+    sys_dsp_obj_set_invalid(midi_tool_stop, false);
 
     midi_kbd = sys_dsp_rect_register(midi_backgraund, 0, 77, 240, 42, 0x9cf3);
     if (midi_kbd == NULL)
@@ -185,7 +230,9 @@ static esp_err_t app_ui_uninit(app_t *app) {
     app->state = APP_STATE_UNINIT;
     return ESP_OK;
 }
+
 static size_t app_ui_get_state(struct app_s *app, int16_t state, void *out, uint8_t size) {return 0;}
+
 static esp_err_t app_ui_command(app_t *app, int16_t command, ...) {
     esp_err_t err = ESP_OK;
     va_list args;
@@ -195,10 +242,16 @@ static esp_err_t app_ui_command(app_t *app, int16_t command, ...) {
 
     switch (cmd)
     {
-    case APP_UI_SET_KEY:
+    case APP_UI_CMD_SET_KEY:
         int key_number = va_arg(args, int);
         int color = va_arg(args, int);
         err = sys_dsp_rect_set_color(midi__keys[key_number / 14][key_number % 14], (uint16_t)color);
+        break;
+
+    case APP_UI_CMD_UPDATE_IP:
+        char tmp_buff[20];
+        app_web_get_ip(tmp_buff, 20);
+        err = sys_dsp_text_set_text(bar_ip_text, tmp_buff);
         break;
     
     default:

@@ -332,6 +332,108 @@ ui_obj_t *sys_dsp_pic_register(ui_obj_t *parent, int16_t x, int16_t y, uint16_t 
     return sys_dsp_obj_alloc(parent, rect, UI_OBJ_CLASS_PIC, pic, sys_dsp_pic_draw, NULL);
 }
 
+// --- icon -----------------------------------------------------------------
+//
+// Monochrome bitmap icon. `bits` is a caller-owned, row-major, MSB-first
+// bitmap with a stride of (w + 7) / 8 bytes: bit (row, col) lives in byte
+// row * stride + col / 8, at mask 0x80 >> (col % 8). w/h come from the
+// object's rect, so the same glyph can be registered at any size as long as
+// the bitmap is laid out for it. Like PIC, the bitmap is not copied (a
+// `static const uint8_t[]` in flash is the intended use); only the small ctx
+// struct is owned by the object. Like TEXT, a clear bit writes nothing --
+// whatever was painted before shows through, so icons composite onto a
+// background of any color without needing to know it.
+
+typedef struct {
+    const uint8_t *bits;   // caller-owned
+    uint16_t color;
+} sys_dsp_icon_ctx_t;
+
+static inline bool sys_dsp_icon_bit(const uint8_t *bits, size_t stride, uint16_t col, uint16_t row)
+{
+    return (bits[row * stride + col / 8] & (0x80u >> (col % 8))) != 0;
+}
+
+static void sys_dsp_icon_draw(ui_obj_t *self, rect_t *abs_rect, rect_t *band)
+{
+    rect_t clip;
+    if (!sys_dsp_clip(&clip, abs_rect, band)) {
+        return;
+    }
+
+    sys_dsp_icon_ctx_t *ctx = self->ctx;
+    if (ctx->bits == NULL) {
+        return;
+    }
+
+    uint16_t fg = sys_dsp_swap16(ctx->color);
+    size_t stride = ((size_t)abs_rect->w + 7) / 8;
+
+    for (uint16_t row = 0; row < clip.h; row++) {
+        uint16_t self_row = clip.y - abs_rect->y + row;
+        uint16_t *dst = sys_dsp_send_buff + (size_t)(clip.y - band->y + row) * band->w + (clip.x - band->x);
+        for (uint16_t col = 0; col < clip.w; col++) {
+            uint16_t self_col = clip.x - abs_rect->x + col;
+            if (sys_dsp_icon_bit(ctx->bits, stride, self_col, self_row)) {
+                dst[col] = fg;
+            }
+        }
+    }
+}
+
+ui_obj_t *sys_dsp_icon_register(ui_obj_t *parent, int16_t x, int16_t y, uint16_t w, uint16_t h,
+                                 const uint8_t *bits, uint16_t color)
+{
+    sys_dsp_icon_ctx_t *ctx = malloc(sizeof(sys_dsp_icon_ctx_t));
+    if (ctx == NULL) {
+        return NULL;
+    }
+    ctx->bits = bits;
+    ctx->color = color;
+
+    rect_t rect = { .x = x, .y = y, .w = w, .h = h };
+    ui_obj_t *obj = sys_dsp_obj_alloc(parent, rect, UI_OBJ_CLASS_ICON, ctx, sys_dsp_icon_draw, sys_dsp_free_ctx_simple);
+    if (obj == NULL) {
+        free(ctx);
+    }
+    return obj;
+}
+
+esp_err_t sys_dsp_icon_set_color(ui_obj_t *obj, uint16_t color)
+{
+    if (obj == NULL || obj->kind != UI_OBJ_CLASS_ICON) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    rect_t abs_rect;
+    xSemaphoreTake(s_tree_lock, portMAX_DELAY);
+    ((sys_dsp_icon_ctx_t *)obj->ctx)->color = color;
+    abs_rect = sys_dsp_obj_abs_rect(obj);
+    xSemaphoreGive(s_tree_lock);
+
+    sys_dsp_invalidate(abs_rect);
+    return ESP_OK;
+}
+
+// Swaps in another glyph of the same w/h -- the bitmap isn't copied, so the
+// new one must stay alive for as long as it can be drawn.
+esp_err_t sys_dsp_icon_set_bits(ui_obj_t *obj, const uint8_t *bits)
+{
+    if (obj == NULL || obj->kind != UI_OBJ_CLASS_ICON) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    rect_t abs_rect;
+    xSemaphoreTake(s_tree_lock, portMAX_DELAY);
+    ((sys_dsp_icon_ctx_t *)obj->ctx)->bits = bits;
+    abs_rect = sys_dsp_obj_abs_rect(obj);
+    xSemaphoreGive(s_tree_lock);
+
+    sys_dsp_invalidate(abs_rect);
+    return ESP_OK;
+}
+
+
 typedef struct {
     char *text;   // owned, NUL-terminated, `cap` bytes total
     size_t cap;

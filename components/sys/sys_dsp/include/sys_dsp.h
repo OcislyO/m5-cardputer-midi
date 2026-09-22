@@ -24,6 +24,7 @@ typedef enum
     UI_OBJ_CLASS_RECT,
     UI_OBJ_CLASS_PIC,
     UI_OBJ_CLASS_TEXT,
+    UI_OBJ_CLASS_ICON,
 } ui_obj_class_t;
 
 typedef struct ui_obj
@@ -61,6 +62,14 @@ ui_obj_t *sys_dsp_rect_register(ui_obj_t *parent, int16_t x, int16_t y, uint16_t
 
 ui_obj_t *sys_dsp_pic_register(ui_obj_t *parent, int16_t x, int16_t y, uint16_t w, uint16_t h, uint16_t *pic);
 
+// Monochrome icon drawn in `color`. bits is a caller-owned, row-major,
+// MSB-first bitmap with a stride of (w + 7) / 8 bytes: bit (row, col) is
+// byte row * stride + col / 8, mask 0x80 >> (col % 8). Set bits paint, clear
+// bits are transparent (whatever was drawn underneath shows through). The
+// bitmap is not copied -- pass a static const array that outlives the object.
+ui_obj_t *sys_dsp_icon_register(ui_obj_t *parent, int16_t x, int16_t y, uint16_t w, uint16_t h,
+                                 const uint8_t *bits, uint16_t color);
+
 void sys_dsp_obj_unregister(ui_obj_t *obj);
 
 esp_err_t sys_dsp_obj_move(ui_obj_t *obj, int16_t x, int16_t y);
@@ -75,6 +84,11 @@ esp_err_t sys_dsp_obj_set_invalid(ui_obj_t *obj, bool invalid);
 esp_err_t sys_dsp_rect_set_color(ui_obj_t *obj, uint16_t color);
 
 esp_err_t sys_dsp_text_set_color(ui_obj_t *obj, uint16_t color);
+
+esp_err_t sys_dsp_icon_set_color(ui_obj_t *obj, uint16_t color);
+
+// Swaps in another glyph of the same w/h.
+esp_err_t sys_dsp_icon_set_bits(ui_obj_t *obj, const uint8_t *bits);
 
 void sys_dsp_invalidate(rect_t rect);
 

@@ -142,7 +142,7 @@ static void app_midi_kbd_task(void *arg)
             if (raw.row == APP_MIDI_KBD_ROW_LOWER || raw.row == APP_MIDI_KBD_ROW_UPPER) {
                 offset_note = app_midi_kbd_map[raw.row - 2][raw.col];
                 state->key_tab[raw.row - 2][raw.col] = offset_note + base_note;
-                ui_app->command(ui_app, APP_UI_SET_KEY, (raw.row - 2) * 14 + raw.col, 0xfdea);
+                ui_app->command(ui_app, APP_UI_CMD_SET_KEY, (raw.row - 2) * 14 + raw.col, 0xfdea);
             } else if (raw.row == 0) {
                 if (raw.col == 11) {
                     state->oct = state->oct - 1 < -3 ? -3 : state->oct - 1;
@@ -161,7 +161,7 @@ static void app_midi_kbd_task(void *arg)
                 } else {
                     offset_note = app_midi_kbd_map[raw.row - 2][raw.col];
                 }
-                ui_app->command(ui_app, APP_UI_SET_KEY, (raw.row - 2) * 14 + raw.col, raw.row - 2 ? 0xe73c : 0x39aa);
+                ui_app->command(ui_app, APP_UI_CMD_SET_KEY, (raw.row - 2) * 14 + raw.col, raw.row - 2 ? 0xe73c : 0x39aa);
             }
         }
 

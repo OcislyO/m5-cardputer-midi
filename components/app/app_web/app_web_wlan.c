@@ -3,6 +3,8 @@
 // sys_wlan; this file only translates HTTP <-> sys_wlan calls.
 #include "app_web_wlan.h"
 #include "sys_wlan.h"
+#include "app.h"
+#include "app_ui.h"
 #include "cJSON.h"
 #include "esp_http_server.h"
 #include "esp_log.h"
@@ -190,6 +192,8 @@ static esp_err_t web_wlan_connect_post(httpd_req_t *req)
     const char *pass = (password != NULL) ? password->valuestring : "";
     err = sys_wlan_connect(ssid->valuestring, pass, true);
     cJSON_Delete(root);
+
+    ui_app->command(ui_app, APP_UI_CMD_UPDATE_IP);
 
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "connect failed to start: %s", esp_err_to_name(err));

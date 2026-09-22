@@ -12,13 +12,14 @@ typedef struct app_ui_state_s {
 } app_ui_state_t;
 
 typedef enum {
-    APP_UI_OCT = 0,
+    APP_UI_STATE_OCT = 0,
     APP_UI_STATE_MAX
 } app_ui_state_id_t;
 
 typedef enum {
-    APP_UI_SET_OCT = 0,
-    APP_UI_SET_KEY,
+    APP_UI_CMD_SET_OCT = 0,
+    APP_UI_CMD_SET_KEY,
+    APP_UI_CMD_UPDATE_IP,
     APP_UI_CMD_MAX
 } app_ui_cmd_id_t;
 
